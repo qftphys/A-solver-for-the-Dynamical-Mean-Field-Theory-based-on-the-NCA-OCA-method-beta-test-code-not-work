@@ -175,7 +175,7 @@ contains
     do itau=0,Ltau
        do ispin=1,Nspin
           do iorb=1,Norb
-             Matrix = matmul(ncaR(:,:,Ltau-itau),Coperator(ispin,iorb)%Op)
+             Matrix =-matmul(ncaR(:,:,Ltau-itau),Coperator(ispin,iorb)%Op)
              Matrix = matmul(Matrix,ncaR(:,:,itau))
              Matrix = matmul(Matrix,CDGoperator(ispin,iorb)%Op)
              trace=0d0
@@ -192,7 +192,7 @@ contains
           call fftgf_tau2iw(impGtau(ispin,ispin,iorb,iorb,0:Ltau),impGmats(ispin,ispin,iorb,iorb,:),beta)
        enddo
     enddo
-    print*,"N=",2.d0*impGtau(1,1,1,1,Ltau)
+    print*,"N=",-2.d0*impGtau(1,1,1,1,Ltau)
     !
     call print_imp_gf
   end subroutine nca_build_impurity_gf

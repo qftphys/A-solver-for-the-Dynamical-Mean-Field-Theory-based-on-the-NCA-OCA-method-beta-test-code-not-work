@@ -33,5 +33,9 @@ program nca_test
      converged = check_convergence(delta(1,1,1,1,:),dmft_error,nsuccess,nloop,reset=.false.)
      call end_loop
   enddo
-
+  open(100,file="Delta_iw.nca")
+  do i=1,Lmats
+     write(100,*)pi/beta*(2*i-1),dimag(Delta(1,1,1,1,i)),dreal(Delta(1,1,1,1,i))
+  enddo
+  close(100)
 end program nca_test
