@@ -1,5 +1,5 @@
 module NCA_MAIN
-  USE FFTGF
+  USE DMFT_FFTGF
   !
   USE NCA_INPUT_VARS
   USE NCA_VARS_GLOBAL
@@ -41,7 +41,7 @@ contains
     NcaDeltaAnd_iw = Delta
     do ispin=1,Nspin
        do iorb=1,Norb
-          call fftgf_iw2tau(NcaDeltaAnd_iw(ispin,ispin,iorb,iorb,:),&
+          call fft_gf_iw2tau(NcaDeltaAnd_iw(ispin,ispin,iorb,iorb,:),&
                NcaDeltaAnd_tau(ispin,ispin,iorb,iorb,0:),beta)
        enddo
     enddo

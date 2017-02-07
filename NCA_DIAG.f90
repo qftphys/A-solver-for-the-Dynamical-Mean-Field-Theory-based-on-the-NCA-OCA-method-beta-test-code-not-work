@@ -3,11 +3,11 @@
 !|{ImpUP1,...,ImpUPN},BathUP>|{ImpDW1,...,ImpDWN},BathDW>
 !########################################################################
 module NCA_DIAG
-  USE CONSTANTS,only: one,xi,zero,pi
-  USE TIMER
-  USE IOTOOLS,  only: free_unit,reg,free_units,txtfy
-  USE ARRAYS,   only: arange,linspace
-  USE MATRIX,   only: matrix_inverse,matrix_diagonalize
+  USE SF_CONSTANTS,only: one,xi,zero,pi
+  USE SF_TIMER
+  USE SF_IOTOOLS,  only: free_unit,reg,free_units,txtfy
+  USE SF_ARRAYS,   only: arange,linspace
+  USE SF_LINALG,   only: matrix_inverse,matrix_diagonalize
   !
   USE NCA_INPUT_VARS
   USE NCA_VARS_GLOBAL

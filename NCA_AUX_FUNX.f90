@@ -1,6 +1,6 @@
 MODULE NCA_AUX_FUNX
-  USE TIMER
-  USE IOTOOLS, only:free_unit,reg
+  USE SF_TIMER
+  USE SF_IOTOOLS, only:free_unit,reg
   USE NCA_INPUT_VARS
   USE NCA_VARS_GLOBAL
   implicit none

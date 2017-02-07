@@ -7,11 +7,10 @@
 !AUTHORS  : Adriano Amaricci
 !###################################################################
 MODULE NCA_GREENS_FUNCTIONS
-  USE CONSTANTS,only: one,xi,zero,pi
-  USE IOTOOLS,  only: free_unit,txtfy,reg,free_units
-  USE ARRAYS,   only: arange,linspace
-  USE FFTGF,    only: fftgf_iw2tau,fftgf_tau2iw
-  USE ERROR
+  USE SF_CONSTANTS,only: one,xi,zero,pi
+  USE SF_IOTOOLS,  only: free_unit,txtfy,reg,free_units
+  USE SF_ARRAYS,   only: arange,linspace
+  USE DMFT_FFTGF
   USE NCA_INPUT_VARS
   USE NCA_VARS_GLOBAL
   USE NCA_AUX_FUNX
@@ -137,6 +136,8 @@ contains
        converged = (error<=1.d-6)
        print*,error,converged
     enddo
+
+
   end subroutine nca_build_dressed_propagator
 
 
@@ -168,8 +169,8 @@ contains
           enddo
        enddo
     enddo
-    print*,"Z=",zeta_function
-    print*,"N=",2.d0*nca_dens
+    print*,"Z     =",zeta_function
+    print*,"Nimp  =",2.d0*nca_dens
     !
     impGtau=0d0
     do itau=0,Ltau
@@ -189,10 +190,10 @@ contains
     !
     do ispin=1,Nspin
        do iorb=1,Norb
-          call fftgf_tau2iw(impGtau(ispin,ispin,iorb,iorb,0:Ltau),impGmats(ispin,ispin,iorb,iorb,:),beta)
+          call fft_gf_tau2iw(impGmats(ispin,ispin,iorb,iorb,:),impGtau(ispin,ispin,iorb,iorb,0:Ltau),beta)
        enddo
     enddo
-    print*,"N=",-2.d0*impGtau(1,1,1,1,Ltau)
+    print*,"N(tau)=",-2.d0*impGtau(1,1,1,1,Ltau)
     !
     call print_imp_gf
   end subroutine nca_build_impurity_gf
@@ -215,7 +216,6 @@ contains
     n0 = 0.5d0
     C0=Uloc(1)*(n0-0.5d0)
     C1=Uloc(1)**2*n0*(1.d0-n0)
-
     !
     !Diagonal in both spin and orbital: this is ensured by the special *per impurity" bath structure
     !no intra-orbital hoopings
@@ -223,8 +223,8 @@ contains
        do iorb=1,Norb
           do i=1,Lmats
              fg0 = xi*wm(i) + xmu - Hloc(ispin,ispin,iorb,iorb) - ncaDeltaAnd_iw(ispin,ispin,iorb,iorb,i)
-             impSmats(ispin,ispin,iorb,iorb,i)= fg0 - one/impGmats(ispin,ispin,iorb,iorb,i)
              impG0mats(ispin,ispin,iorb,iorb,i) = one/fg0
+             impSmats(ispin,ispin,iorb,iorb,i)= fg0 - one/impGmats(ispin,ispin,iorb,iorb,i)
              Stail(ispin,ispin,iorb,iorb,i) = C0 + C1/(xi*wm(i))
           enddo
        enddo
