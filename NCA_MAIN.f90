@@ -17,7 +17,7 @@ contains
   subroutine nca_init_solver(Hunit)
     character(len=*),optional,intent(in)              :: Hunit
     character(len=100)                                :: Hunit_
-    write(LOGfile,"(A)")"INIT NCA SOLVER"
+    write(*,"(A)")"INIT NCA SOLVER"
     Hunit_='inputHLOC.in';if(present(Hunit))Hunit_=Hunit
     call nca_init_structure(Hunit_)
     call setup_pointers
@@ -37,7 +37,7 @@ contains
   subroutine nca_solver(Delta)
     complex(8),dimension(Nspin,Nspin,Norb,Norb,Lmats) :: Delta
     integer                                           :: ispin,iorb
-    write(LOGfile,"(A)")"START NCA SOLVER"
+    write(*,"(A)")"START NCA SOLVER"
     NcaDeltaAnd_iw = Delta
     do ispin=1,Nspin
        do iorb=1,Norb

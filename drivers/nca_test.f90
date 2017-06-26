@@ -4,7 +4,7 @@ program nca_test
   USE DMFT_TOOLS
   implicit none
   integer,parameter                           :: Nbath=7
-  real(8),dimension(Nbath)                    :: epsk,vk
+  complex(8),dimension(:),allocatable         :: fg0
   complex(8),dimension(:,:,:,:,:),allocatable :: Delta
   integer                                     :: i,iorb
   !
@@ -13,6 +13,7 @@ program nca_test
 
   print*, "NCA_TEST:"
   call nca_read_input("inputNCA.conf")
+  
   allocate(Delta(Nspin,Nspin,Norb,Norb,Lmats))
   Delta=zero
   open(100,file="Delta_iw.input")

@@ -7,7 +7,7 @@ module NCA_DIAG
   USE SF_TIMER
   USE SF_IOTOOLS,  only: free_unit,reg,free_units,txtfy
   USE SF_ARRAYS,   only: arange,linspace
-  USE SF_LINALG,   only: matrix_inverse,matrix_diagonalize
+  USE SF_LINALG,   only: inv,eigh
   !
   USE NCA_INPUT_VARS
   USE NCA_VARS_GLOBAL
@@ -36,27 +36,18 @@ contains
     integer                  :: i,j,isector,dim,unit,dim_stride
     real(8),dimension(Nsect) :: e0 
     real(8)                  :: egs
-    real(8),dimension(NN,NN) :: Htotal
     e0=0.d0
-    write(LOGfile,"(A)")"Get Hamiltonian:"
-    call start_progress(LOGfile)
+    write(*,"(A)")"Get Hamiltonian:"
+    call start_timer
     dim_stride=0
-    Htotal=0.d0
     do isector=1,Nsect
        !call progress(isector,Nsect)
        dim=getdim(isector)
        call build_hlocal(isector,espace(isector)%H(:,:))
-       !embed H into Htotal
-       Htotal(dim_stride+1:dim_stride+dim,dim_stride+1:dim_stride+dim) = espace(isector)%H(1:dim,1:dim)
-       dim_stride=dim_stride+dim
-       call matrix_diagonalize(espace(isector)%H,espace(isector)%e,'V','U')
-       do i=1,dim
-          write(LOGfile,"(100(F8.4,1x))")(espace(isector)%H(i,j),j=1,dim)
-       enddo
-       write(LOGfile,*)""
+       call eigh(espace(isector)%H,espace(isector)%e,'V','U')
        e0(isector)=minval(espace(isector)%e)
     enddo
-    call stop_progress
+    call stop_timer
     !
     egs=minval(e0)
     forall(isector=1:Nsect)espace(isector)%e = espace(isector)%e - egs
@@ -68,17 +59,13 @@ contains
           zeta_function_diag=zeta_function_diag+exp(-beta*espace(isector)%e(i))
        enddo
     enddo
-    write(LOGfile,"(A)")"DIAG resume:"
-    write(LOGfile,"(A,f20.12)")'egs  =',egs
-    write(LOGfile,"(A,f20.12)")'Z    =',zeta_function_diag
+    write(*,"(A)")"DIAG resume:"
+    write(*,"(A,f20.12)")'egs  =',egs
+    write(*,"(A,f20.12)")'Z    =',zeta_function_diag
     unit=free_unit()
     open(unit,file="Egs.nca")
     write(unit,*)egs
     close(unit)
-    write(LOGfile,"(A)")"Htotal:"
-    do i=1,NN
-       write(LOGfile,"(100(F8.4,1x))")(Htotal(i,j),j=1,NN)
-    enddo
     return
   end subroutine nca_diagonalize_hlocal
 

@@ -11,6 +11,7 @@ MODULE NCA_GREENS_FUNCTIONS
   USE SF_IOTOOLS,  only: free_unit,txtfy,reg,free_units
   USE SF_ARRAYS,   only: arange,linspace
   USE DMFT_FFTGF
+  USE DMFT_FFTAUX
   USE NCA_INPUT_VARS
   USE NCA_VARS_GLOBAL
   USE NCA_AUX_FUNX
@@ -51,8 +52,8 @@ contains
     Umat  = 0d0
     Eval  = 0d0
     call allocate_grids
-    allocate(ncaR0(NN,NN,0:Ltau))
-    allocate(ncaR(NN,NN,0:Ltau))
+    allocate(ncaR0(NN,NN,0:Ltau));ncaR0=zero
+    allocate(ncaR(NN,NN,0:Ltau));ncaR=zero
     do isector=1,Nsect
        dim = getdim(isector)
        Umat(stride+1:stride+dim,stride+1:stride+dim) = espace(isector)%H(1:dim,1:dim)
@@ -123,7 +124,7 @@ contains
        ncaRold = ncaR
        !Get the Self-energy:
        call nca_get_sigma_nca(ncaSigma)
-       !Get the polarization SxR0(tau) = int_0^tau d1 SxR0(tau-tau1)R0(tau1)
+       !Get the polarization SxR0(tau) = int_0^tau d1 ncaSigma(tau-tau1)R0(tau1)
        do itau=0,Ltau
           SxR0(:,:,itau) = tau_convolution(ncaSigma,ncaR0,itau,Ltau)*dtau
        enddo
@@ -153,7 +154,8 @@ contains
     real(8),dimension(NN,NN)                        :: Matrix
     real(8),dimension(NN)                           :: Rbeta
     real(8),dimension(Norb) :: nca_dens
-
+    real(8),dimension(0:3) :: Ctail
+    
     if(allocated(impGtau))deallocate(impGtau)
     allocate(impGtau(Nspin,Nspin,Norb,Norb,0:Ltau))
     zeta_function = 0d0
@@ -190,7 +192,8 @@ contains
     !
     do ispin=1,Nspin
        do iorb=1,Norb
-          call fft_gf_tau2iw(impGmats(ispin,ispin,iorb,iorb,:),impGtau(ispin,ispin,iorb,iorb,0:Ltau),beta)
+          Ctail =  tail_coeff_glat(Uloc(1),nca_dens(1),xmu,0d0)
+          call fft_gf_tau2iw(impGmats(ispin,ispin,iorb,iorb,:),impGtau(ispin,ispin,iorb,iorb,0:Ltau),beta,C=Ctail)
        enddo
     enddo
     print*,"N(tau)=",-2.d0*impGtau(1,1,1,1,Ltau)

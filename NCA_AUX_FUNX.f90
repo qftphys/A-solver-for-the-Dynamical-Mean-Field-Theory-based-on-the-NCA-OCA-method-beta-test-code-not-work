@@ -56,14 +56,14 @@ contains
     Nsect = (Ns+1)*(Ns+1)
     NP=get_sector_dimension(nup,ndw)
     !
-    write(LOGfile,*)"Summary:"
-    write(LOGfile,*)"--------------------------------------------"
-    write(LOGfile,*)'Number of sites              = ',Norb
-    write(LOGfile,*)'Max. Number of electrons     = ',Ntot
-    write(LOGfile,*)'Hilbert space dimension      = ',NN
-    write(LOGfile,*)'Number of sectors            = ',Nsect
-    write(LOGfile,*)'Largest sector dimension     = ',NP
-    write(LOGfile,*)"--------------------------------------------"
+    write(*,*)"Summary:"
+    write(*,*)"--------------------------------------------"
+    write(*,*)'Number of sites              = ',Norb
+    write(*,*)'Max. Number of electrons     = ',Ntot
+    write(*,*)'Hilbert space dimension      = ',NN
+    write(*,*)'Number of sectors            = ',Nsect
+    write(*,*)'Largest sector dimension     = ',NP
+    write(*,*)"--------------------------------------------"
 
     allocate(Hloc(Nspin,Nspin,Norb,Norb))
     reHloc = 0.d0
@@ -71,7 +71,7 @@ contains
 
     inquire(file=Hunit,exist=control)
     if(control)then
-       write(LOGfile,*)"Reading Hloc from file: "//Hunit
+       write(*,*)"Reading Hloc from file: "//Hunit
        open(50,file=Hunit,status='old')
        do ispin=1,Nspin
           do iorb=1,Norb
@@ -85,11 +85,11 @@ contains
        enddo
        close(50)
     else
-       write(LOGfile,*)"Hloc file not found."
-       write(LOGfile,*)"Hloc should be defined elsewhere..."
+       write(*,*)"Hloc file not found."
+       write(*,*)"Hloc should be defined elsewhere..."
     endif
     Hloc = dcmplx(reHloc,imHloc)
-    write(LOGfile,"(A)")"H_local:"
+    write(*,"(A)")"H_local:"
     call print_Hloc(Hloc)
 
     !Allocate pointers
@@ -132,7 +132,7 @@ contains
     complex(8),dimension(Nspin,Nspin,Norb,Norb) :: hloc
     do ispin=1,Nspin
        do iorb=1,Norb
-          write(LOGfile,"(20(A1,F7.3,A1,F7.3,A1,2x))")&
+          write(*,"(20(A1,F7.3,A1,F7.3,A1,2x))")&
                (&
                (&
                '(',dreal(Hloc(ispin,jspin,iorb,jorb)),',',dimag(Hloc(ispin,jspin,iorb,jorb)),')',&
@@ -167,7 +167,7 @@ contains
   subroutine setup_pointers
     integer                          :: ispin,dim,isector
     integer                          :: nup,ndw,iorb
-    write(LOGfile,"(A)")"Setting up pointers:"
+    write(*,"(A)")"Setting up pointers:"
     call start_timer
     isector=0
     do nup=0,Ns
