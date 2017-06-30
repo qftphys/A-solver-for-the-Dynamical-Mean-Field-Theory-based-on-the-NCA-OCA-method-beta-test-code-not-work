@@ -1,12 +1,11 @@
 module NCA_MAIN
-  USE DMFT_FFTGF
-  !
-  USE NCA_INPUT_VARS
   USE NCA_VARS_GLOBAL
-  USE NCA_AUX_FUNX
+  USE NCA_SETUP
   USE NCA_DIAG
   USE NCA_GREENS_FUNCTIONS
-
+  !
+  USE DMFT_FFTGF
+  !
   implicit none
 
 contains
@@ -14,13 +13,24 @@ contains
   !+------------------------------------------------------------------+
   !PURPOSE  : 
   !+------------------------------------------------------------------+
-  subroutine nca_init_solver(Hunit)
-    character(len=*),optional,intent(in)              :: Hunit
-    character(len=100)                                :: Hunit_
+  subroutine nca_init_solver(Hloc)
+    complex(8),dimension(Nspin,Nspin,Norb,Norb),intent(in) :: Hloc
     write(*,"(A)")"INIT NCA SOLVER"
-    Hunit_='inputHLOC.in';if(present(Hunit))Hunit_=Hunit
-    call nca_init_structure(Hunit_)
+    !>debug
+    print*,"entering nca_init_structure"
+    !<debug
+    call nca_init_structure()
+    !>debug
+    print*,"calling set_Hloc"
+    !<debug
+    call set_Hloc(Hloc)
+    !>debug
+    print*,"entering setup_pointers"
+    !<debug
     call setup_pointers
+    !>debug
+    print*,"entering setup_eigenspace"
+    !<debug
     call setup_eigenspace
     call nca_diagonalize_hlocal
     call nca_build_operators

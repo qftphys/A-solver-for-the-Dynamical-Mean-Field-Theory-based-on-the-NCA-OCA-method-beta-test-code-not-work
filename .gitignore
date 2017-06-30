@@ -19,3 +19,4 @@ NCA_MAIN.o
 NCA_VARS_GLOBAL.o
 revision.inc
 .DS_Store
+testing

@@ -8,14 +8,14 @@ program nca_hm_bethe
   real(8)                                     :: wband
 
   !The local hybridization function:
-  complex(8),allocatable                      :: Hloc_(:,:,:,:)
+  complex(8),allocatable                      :: Hloc(:,:,:,:)
   complex(8),allocatable,dimension(:,:,:,:,:) :: Delta,Smats,Sreal,Gmats,Greal
   character(len=16)                           :: finput
   real(8)                                     :: wmixing,Eout(2),de,dens
   real(8),allocatable                         :: Gtau(:)
   real(8),dimension(:,:,:),allocatable        :: He
   real(8),dimension(:),allocatable            :: Wte
-  logical :: sc_bethe
+  logical                                     :: sc_bethe
 
   call parse_cmd_variable(finput,"FINPUT",default='inputNCA.conf')
   call parse_input_variable(wband,"wband",finput,default=1d0)
@@ -41,11 +41,10 @@ program nca_hm_bethe
   allocate(Delta(Nspin,Nspin,Norb,Norb,Lmats))
   allocate(Smats(Nspin,Nspin,Norb,Norb,Lmats))
   allocate(Gmats(Nspin,Nspin,Norb,Norb,Lmats))
-  allocate(Hloc_(Nspin,Nspin,Norb,Norb))
-  Hloc_=zero
+  allocate(Hloc(Nspin,Nspin,Norb,Norb))
+  Hloc=zero
 
-
-  call nca_init_solver()
+  call nca_init_solver(Hloc)
 
   converged=.false. ; dmft_loop=0 
   do while(.not.converged.AND.dmft_loop<nloop)
@@ -61,7 +60,7 @@ program nca_hm_bethe
      if(sc_bethe)then
         Delta = wband**2*0.25d0*impGmats
      else
-        call dmft_delta(Gmats,Smats,Delta,Hloc_,iprint=1)
+        call dmft_delta(Gmats,Smats,Delta,Hloc,iprint=1)
      endif
 
 
@@ -70,7 +69,7 @@ program nca_hm_bethe
      call end_loop
   enddo
 
-  Eout = dmft_kinetic_energy(one*He,Wte,Smats)
+  call dmft_kinetic_energy(one*He,Wte,Smats)
 
   ! open(100,file="Delta_iw.nca")
   ! do i=1,Lmats

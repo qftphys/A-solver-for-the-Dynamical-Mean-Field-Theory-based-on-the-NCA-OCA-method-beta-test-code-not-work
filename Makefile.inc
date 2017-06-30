@@ -57,11 +57,15 @@ endif
 ###############################################################################
 
 
-OBJS= NCA_VARS_GLOBAL.o NCA_INPUT_VARS.o NCA_AUX_FUNX.o NCA_HLOCAL.o NCA_DIAG.o NCA_GREENS_FUNCTIONS.o NCA_MAIN.o DMFT_NCA.o
+OBJS= NCA_VARS_GLOBAL.o NCA_SETUP.o NCA_DIAG.o NCA_GREENS_FUNCTIONS.o NCA_MAIN.o DMFT_NCA.o
 
 all: all version compile completion
+debug: debug version compile completion
 
 all: FPPFLAG+=-D_
+
+debug: FFLAG=$(DFLAG)
+debug: FPPFLAG+=-D_
 
 
 compile: $(OBJS)
