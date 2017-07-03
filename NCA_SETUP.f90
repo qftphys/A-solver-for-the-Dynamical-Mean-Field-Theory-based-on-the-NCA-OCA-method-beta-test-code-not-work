@@ -89,6 +89,9 @@ contains
     allocate(NcaDeltaAnd_tau(Nspin,Nspin,Norb,Norb,0:Ltau))
     allocate(NcaDeltaAnd_iw(Nspin,Nspin,Norb,Norb,Lmats))
 
+    !allocate atomic propagators
+    allocate(ncaR0(Nhilbert,Nhilbert,0:Ltau))
+    allocate(ncaR(Nhilbert,Nhilbert,0:Ltau))
 
     !allocate observables:
     allocate(nca_dens(Norb))

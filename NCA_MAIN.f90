@@ -3,6 +3,7 @@ module NCA_MAIN
   USE NCA_SETUP
   USE NCA_DIAG
   USE NCA_GREENS_FUNCTIONS
+  USE NCA_OBSERVABLES
   !
   USE DMFT_FFTGF
   !
@@ -15,22 +16,10 @@ contains
   !+------------------------------------------------------------------+
   subroutine nca_init_solver(Hloc)
     complex(8),dimension(Nspin,Nspin,Norb,Norb),intent(in) :: Hloc
-    write(*,"(A)")"INIT NCA SOLVER"
-    !>debug
-    print*,"entering nca_init_structure"
-    !<debug
+    write(LOGfile,"(A)")"INIT NCA SOLVER"
     call nca_init_structure()
-    !>debug
-    print*,"calling set_Hloc"
-    !<debug
     call set_Hloc(Hloc)
-    !>debug
-    print*,"entering setup_pointers"
-    !<debug
     call setup_pointers
-    !>debug
-    print*,"entering setup_eigenspace"
-    !<debug
     call setup_eigenspace
     call nca_diagonalize_hlocal
     call nca_build_operators
@@ -47,7 +36,7 @@ contains
   subroutine nca_solver(Delta)
     complex(8),dimension(Nspin,Nspin,Norb,Norb,Lmats) :: Delta
     integer                                           :: ispin,iorb
-    write(*,"(A)")"START NCA SOLVER"
+    write(LOGfile,"(A)")"START NCA SOLVER"
     NcaDeltaAnd_iw = Delta
     do ispin=1,Nspin
        do iorb=1,Norb
@@ -57,6 +46,7 @@ contains
     enddo
     call nca_build_dressed_propagator
     call nca_build_impurity_gf
+    call nca_build_observables
   end subroutine nca_solver
 
 end module NCA_MAIN

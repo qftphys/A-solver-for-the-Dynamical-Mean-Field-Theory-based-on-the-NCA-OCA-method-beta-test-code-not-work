@@ -53,6 +53,7 @@ MODULE NCA_VARS_GLOBAL
 
 
 
+
   !SECTOR-TO-FOCK SPACE STRUCTURE
   !=========================================================
   type sector_map
@@ -79,6 +80,13 @@ MODULE NCA_VARS_GLOBAL
   !=========================================================
   complex(8),allocatable,dimension(:,:,:,:,:)             :: NcaDeltaAnd_iw
   real(8),allocatable,dimension(:,:,:,:,:)                :: NcaDeltaAnd_tau
+
+
+
+  !Atomic limit bare and dressed propagato: ncaR0(tau),ncaR(tau): [Nhilbert][Nhilbert][0:Ltau]
+  !=========================================================
+  real(8),allocatable,dimension(:,:,:)     :: ncaR0
+  real(8),allocatable,dimension(:,:,:)     :: ncaR
 
 
   !Impurity Green's function and Self-Energies: (Nspin,Nspin,Norb,Norb,:)

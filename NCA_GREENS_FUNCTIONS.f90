@@ -22,8 +22,7 @@ MODULE NCA_GREENS_FUNCTIONS
   !Strong coupling propagators R_{0,nca}(tau) & R_nca(tau): (2*Ntot,2*Ntot,0:Ltau)
   !=========================================================
   real(8),allocatable,dimension(:,:,:,:,:) :: impGtau
-  real(8),allocatable,dimension(:,:,:)     :: ncaR0
-  real(8),allocatable,dimension(:,:,:)     :: ncaR
+
 
 
 
@@ -48,13 +47,12 @@ contains
     integer                              :: is,itau,isector,stride,dim
     real(8),dimension(Nhilbert)          :: Eval
     real(8),dimension(Nhilbert,Nhilbert) :: Umat
-    complex(8),dimension(Nhilbert,Lmats) :: ncaR0iw
     stride= 0
     Umat  = 0d0
     Eval  = 0d0
     call allocate_grids
-    allocate(ncaR0(Nhilbert,Nhilbert,0:Ltau));ncaR0=zero
-    allocate(ncaR(Nhilbert,Nhilbert,0:Ltau));ncaR=zero
+    ncaR0=zero
+    ncaR =zero
     do isector = 1 , Nsectors
        dim = getdim(isector)
        Umat(stride+1:stride+dim,stride+1:stride+dim) = espace(isector)%H(1:dim,1:dim)
@@ -152,29 +150,15 @@ contains
     integer                              :: ispin,iorb,is,itau
     real(8)                              :: trace
     real(8),dimension(Nhilbert,Nhilbert) :: Matrix
-    real(8),dimension(Nhilbert)          :: Rbeta
     real(8),dimension(0:3)               :: Ctail
+    !
+    zeta_function=0d0
+    do is=1,Nhilbert
+       zeta_function = zeta_function + ncaR(is,is,Ltau)
+    end do
     !
     if(allocated(impGtau))deallocate(impGtau)
     allocate(impGtau(Nspin,Nspin,Norb,Norb,0:Ltau))
-    !
-    zeta_function = 0d0
-    !
-    Rbeta=0d0
-    forall(is=1:Nhilbert)Rbeta(is)=ncaR(is,is,Ltau)
-    !
-    do ispin=1,Nspin
-       nca_dens = 0d0
-       do iorb=1,Norb
-          Matrix = matmul(CDGoperator(ispin,iorb)%Op,Coperator(ispin,iorb)%Op)
-          zeta_function = sum(Rbeta(:))
-          do is=1,Nhilbert
-             nca_dens(iorb)= nca_dens(iorb) + Rbeta(is)*Matrix(is,is)/zeta_function
-          enddo
-       enddo
-    enddo
-    print*,"Z     =",zeta_function
-    print*,"Nimp  =",2.d0*nca_dens
     !
     impGtau=0d0
     do itau=0,Ltau
@@ -183,7 +167,7 @@ contains
              Matrix =-matmul(ncaR(:,:,Ltau-itau),Coperator(ispin,iorb)%Op)
              Matrix = matmul(Matrix,ncaR(:,:,itau))
              Matrix = matmul(Matrix,CDGoperator(ispin,iorb)%Op)
-             trace=0d0
+             trace  = 0d0
              do is=1,Nhilbert
                 trace=trace+Matrix(is,is)
              enddo
