@@ -138,7 +138,7 @@ contains
   subroutine nca_read_input(INPUTunit)
     character(len=*)                                      :: INPUTunit
     !DEFAULT VALUES OF THE PARAMETERS:
-    call parse_input_variable(beta,"BETA",INPUTunit,default=500.d0,comment="Inverse temperature, at T=0 is used as a IR cut-off.")
+    call parse_input_variable(beta,"BETA",INPUTunit,default=50.d0,comment="Inverse temperature.")
     call parse_input_variable(xmu,"XMU",INPUTunit,default=0.d0,comment="Chemical potential. If HFMODE=T, xmu=0 indicates half-filling condition.")
     call parse_input_variable(Norb,"NORB",INPUTunit,default=1,comment="Number of impurity orbitals.")
     call parse_input_variable(Nspin,"NSPIN",INPUTunit,default=1,comment="Number of spin degeneracy (max 2)")
@@ -155,8 +155,8 @@ contains
     call parse_input_variable(nca_error,"NCA_ERROR",INPUTunit,default=1d-12,comment="Error threshold for the NCA cycle")
     call parse_input_variable(nsuccess,"NSUCCESS",INPUTunit,default=1,comment="Number of successive iterations below threshold for convergence")
     !
-    call parse_input_variable(Lmats,"LMATS",INPUTunit,default=2000,comment="Number of Matsubara frequencies.")
-    call parse_input_variable(Ltau,"LTAU",INPUTunit,default=1000,comment="Number of imaginary time points.")
+    call parse_input_variable(Lmats,"LMATS",INPUTunit,default=2048,comment="Number of Matsubara frequencies.")
+    call parse_input_variable(Ltau,"LTAU",INPUTunit,default=512,comment="Number of imaginary time points.")
     call parse_input_variable(cutoff,"CUTOFF",INPUTunit,default=1.d-9,comment="Spectrum cut-off, used to determine the number states to be retained.")
     call parse_input_variable(gs_threshold,"GS_THRESHOLD",INPUTunit,default=1.d-9,comment="Energy threshold for ground state degeneracy loop up")
     call parse_input_variable(LOGfile,"LOGFILE",INPUTunit,default=6,comment="LOG unit.")

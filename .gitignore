@@ -20,3 +20,9 @@ NCA_VARS_GLOBAL.o
 revision.inc
 .DS_Store
 testing
+CMakeCache.txt
+CMakeFiles
+Makefile
+cmake_install.cmake
+nca_setup.mod
+*.o

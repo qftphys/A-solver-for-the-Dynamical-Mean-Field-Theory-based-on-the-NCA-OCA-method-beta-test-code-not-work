@@ -44,6 +44,10 @@ program nca_hm_bethe
   allocate(Hloc(Nspin,Nspin,Norb,Norb))
   Hloc=zero
 
+  Smats=zero
+  call dmft_gloc_matsubara(one*He,Wte,Gmats,Smats,iprint=1)
+  Delta = wband**2*0.25d0*Gmats
+
   call nca_init_solver(Hloc)
 
   converged=.false. ; dmft_loop=0 
@@ -58,7 +62,7 @@ program nca_hm_bethe
      call dmft_gloc_matsubara(one*He,Wte,Gmats,Smats,iprint=1)
 
      if(sc_bethe)then
-        Delta = wband**2*0.25d0*impGmats
+        Delta = Wband**2*0.25d0*impGmats
      else
         call dmft_delta(Gmats,Smats,Delta,Hloc,iprint=1)
      endif
