@@ -85,8 +85,8 @@ MODULE NCA_VARS_GLOBAL
 
   !Atomic limit bare and dressed propagato: ncaR0(tau),ncaR(tau): [Nhilbert][Nhilbert][0:Ltau]
   !=========================================================
-  real(8),allocatable,dimension(:,:,:)     :: ncaR0
-  real(8),allocatable,dimension(:,:,:)     :: ncaR
+  real(8),allocatable,dimension(:,:,:)                    :: ncaR0
+  real(8),allocatable,dimension(:,:,:)                    :: ncaR
 
 
   !Impurity Green's function and Self-Energies: (Nspin,Nspin,Norb,Norb,:)
@@ -98,9 +98,10 @@ MODULE NCA_VARS_GLOBAL
   !Density and double occupancy
   !=========================================================
   real(8),dimension(:),allocatable                        ::  nca_dens
-  real(8),dimension(:),allocatable                        ::  nca_dens_up,nca_dens_dw
+  real(8),dimension(:),allocatable                        ::  nca_dens_up
+  real(8),dimension(:),allocatable                        ::  nca_dens_dw
   real(8),dimension(:),allocatable                        ::  nca_docc
-
+  real(8),dimension(:),allocatable                        ::  nca_sz2
 
 
   !input variables

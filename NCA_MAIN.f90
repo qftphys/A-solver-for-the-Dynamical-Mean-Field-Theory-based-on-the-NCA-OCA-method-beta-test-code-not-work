@@ -44,9 +44,9 @@ contains
                NcaDeltaAnd_tau(ispin,ispin,iorb,iorb,0:),beta)
        enddo
     enddo
-    call nca_build_dressed_propagator
-    call nca_build_impurity_gf
-    call nca_build_observables
+    call nca_build_dressed_propagator !<-- get ncaR(tau)
+    call nca_get_observables
+    call nca_get_impurity_gf
   end subroutine nca_solver
 
 end module NCA_MAIN

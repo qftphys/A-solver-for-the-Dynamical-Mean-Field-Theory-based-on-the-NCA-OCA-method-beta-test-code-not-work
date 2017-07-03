@@ -12,9 +12,11 @@ MODULE NCA_GREENS_FUNCTIONS
   private 
 
   public :: nca_build_bare_propagator
-  public :: nca_build_impurity_gf
   public :: nca_build_dressed_propagator
+  public :: nca_get_impurity_gf
 
+
+  
   !Frequency and time arrays:
   !=========================================================
   real(8),dimension(:),allocatable     :: wm,tau
@@ -115,7 +117,7 @@ contains
     real(8),dimension(Nhilbert,Nhilbert,0:Ltau) :: ncaSigma,SxR0,ncaRold
     real(8),dimension(Nhilbert,Nhilbert)        :: Matrix1
     real(8)                                     :: dtau,error
-    integer                                     :: itau
+    integer                                     :: itau,is
     logical                                     :: converged
     converged=.false.
     dtau=tau(1)-tau(0)
@@ -136,8 +138,13 @@ contains
        converged = (error<=nca_error)
        print*,error,converged
     enddo
-
-
+    !
+    !
+    zeta_function = 0d0
+    do is=1,Nhilbert
+       zeta_function=zeta_function+ncaR(is,is,Ltau)
+    end do
+    !
   end subroutine nca_build_dressed_propagator
 
 
@@ -146,7 +153,7 @@ contains
   !+------------------------------------------------------------------+
   !PURPOSE  :  G(tau) = -Tr(R(beta-tau)*C*R(tau)*C+)/Z
   !+------------------------------------------------------------------+
-  subroutine nca_build_impurity_gf
+  subroutine nca_get_impurity_gf
     integer                              :: ispin,iorb,is,itau
     real(8)                              :: trace
     real(8),dimension(Nhilbert,Nhilbert) :: Matrix
@@ -178,16 +185,15 @@ contains
     !
     do ispin=1,Nspin
        do iorb=1,Norb
-          Ctail =  tail_coeff_glat(Uloc(1),nca_dens(1),xmu,0d0)
+          Ctail =  tail_coeff_glat(Uloc(iorb),nca_dens(iorb)/2d0,xmu,0d0)
           call fft_gf_tau2iw(impGmats(ispin,ispin,iorb,iorb,:),impGtau(ispin,ispin,iorb,iorb,0:Ltau),beta,C=Ctail)
        enddo
     enddo
     !
-    print*,"N(beta-)=",-2d0*impGtau(1,1,1,1,Ltau)
-    !
+    ! !
     call print_imp_gf
     !
-  end subroutine nca_build_impurity_gf
+  end subroutine nca_get_impurity_gf
 
 
 

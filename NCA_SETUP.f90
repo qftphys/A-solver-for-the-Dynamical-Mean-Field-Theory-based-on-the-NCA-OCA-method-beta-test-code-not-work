@@ -98,6 +98,7 @@ contains
     allocate(nca_dens_up(Norb))
     allocate(nca_dens_dw(Norb))
     allocate(nca_docc(Norb))
+    allocate(nca_sz2(Norb))
 
 
     !allocate functions
