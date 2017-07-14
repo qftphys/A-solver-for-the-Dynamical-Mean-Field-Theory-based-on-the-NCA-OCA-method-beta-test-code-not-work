@@ -16,7 +16,7 @@ contains
 
   subroutine nca_get_observables()
     integer                              :: ispin,iorb
-    real(8),dimension(Nhilbert,Nhilbert) :: Matrix,Mat_up,Mat_dw
+    real(8),dimension(Nfock,Nfock) :: Matrix,Mat_up,Mat_dw
     !
     !
     nca_dens_up = 0d0
@@ -28,27 +28,28 @@ contains
     !
     !Get N_up
     do iorb=1,Norb
+       Matrix = 0d0
        Matrix = matmul(CDGoperator(1,iorb)%Op,Coperator(1,iorb)%Op)
        call nca_build_observable(Matrix,nca_dens_up(iorb))
+       print*,nca_dens_up(iorb)
     enddo
     !
     !Get N_dw
     do iorb=1,Norb
-       Matrix = matmul(CDGoperator(2,iorb)%Op,Coperator(2,iorb)%Op)
+       Matrix = 0d0
+       Matrix = matmul(CDGoperator(Nspin,iorb)%Op,Coperator(Nspin,iorb)%Op)
        call nca_build_observable(Matrix,nca_dens_dw(iorb))
+       print*,nca_dens_dw(iorb)
     enddo
     !
     !Get N=N_up + N_dw
-    ! do ispin=1,Nspin
-    !    do iorb=1,Norb
-    !       Matrix = matmul(CDGoperator(ispin,iorb)%Op,Coperator(ispin,iorb)%Op)
-    !       call nca_build_observable(Matrix,nca_dens(iorb))
-    !    enddo
-    ! enddo
     nca_dens = nca_dens_up + nca_dens_dw
     !
     !Get double occupancy
     do iorb=1,Norb
+       Mat_up = 0d0
+       Mat_dw = 0d0
+       Matrix = 0d0
        Mat_up = matmul(CDGoperator(1,iorb)%Op,Coperator(1,iorb)%Op) !N_up
        Mat_dw = matmul(CDGoperator(2,iorb)%Op,Coperator(2,iorb)%Op) !N_dw
        Matrix = matmul(Mat_up,Mat_dw)                               !D = N_up * N_dw
@@ -64,9 +65,8 @@ contains
     !
     write(LOGfile,"(A,10f18.12,f18.12,A)")"dens=",(nca_dens(iorb),iorb=1,Norb),sum(nca_dens)
     write(LOGfile,"(A,10f18.12,A)")"docc=",(nca_docc(iorb),iorb=1,Norb)
-    if(Nspin==2)write(LOGfile,"(A,10f18.12,A)") "mag =",(nca_magz(iorb),iorb=1,Norb)
+    if(Nspin>1)write(LOGfile,"(A,10f18.12,A)") "mag =",(nca_magz(iorb),iorb=1,Norb)
     !
-
     if(iolegend)call write_legend
     call write_observables()
     !
@@ -74,14 +74,14 @@ contains
 
 
   subroutine nca_build_observable(Matrix,observable)
-    real(8),dimension(Nhilbert,Nhilbert) :: Matrix
+    real(8),dimension(Nfock,Nfock) :: Matrix
     real(8)                              :: observable
     integer :: is
     !
     observable=0d0
     !
     Matrix = matmul(ncaR(:,:,Ltau),Matrix)
-    do is=1,Nhilbert
+    do is=1,Nfock
        observable= observable + Matrix(is,is)/zeta_function
     enddo
     !
@@ -102,7 +102,8 @@ contains
          (str(2*Norb+iorb)//"nup_"//str(iorb),iorb=1,Norb),&
          (str(3*Norb+iorb)//"ndw_"//str(iorb),iorb=1,Norb),&
          (str(4*Norb+iorb)//"mag_"//str(iorb),iorb=1,Norb),&
-         (str(5*Norb+iorb)//"sz2_"//str(iorb),iorb=1,Norb)
+         (str(5*Norb+iorb)//"sz2_"//str(iorb),iorb=1,Norb),&
+         ((str(6*Norb+iorb)//"z_"//str(iorb)//"s"//str(ispin),iorb=1,Norb),ispin=1,Nspin)
     close(unit)
     !
     unit = free_unit()
@@ -130,7 +131,8 @@ contains
          (nca_dens_up(iorb),iorb=1,Norb),&
          (nca_dens_dw(iorb),iorb=1,Norb),&
          (nca_magz(iorb),iorb=1,Norb),&
-         (nca_sz2(iorb),iorb=1,Norb)
+         (nca_sz2(iorb),iorb=1,Norb),&
+         ((nca_zeta(ispin,iorb),iorb=1,Norb),ispin=1,Nspin)
     close(unit)    
     !
     unit = free_unit()
@@ -146,7 +148,8 @@ contains
          (nca_dens_up(iorb),iorb=1,Norb),&
          (nca_dens_dw(iorb),iorb=1,Norb),&
          (nca_magz(iorb),iorb=1,Norb),&
-         (nca_sz2(iorb),iorb=1,Norb)
+         (nca_sz2(iorb),iorb=1,Norb),&
+         ((nca_zeta(ispin,iorb),iorb=1,Norb),ispin=1,Nspin)
     close(unit)         
   end subroutine write_observables
 
@@ -164,15 +167,15 @@ END MODULE NCA_OBSERVABLES
 
 ! subroutine nca_get_observables()
 !   integer                              :: ispin,iorb,is,itau
-!   real(8),dimension(Nhilbert,Nhilbert) :: Matrix
-!   real(8),dimension(Nhilbert)          :: Rbeta
+!   real(8),dimension(Nfock,Nfock) :: Matrix
+!   real(8),dimension(Nfock)          :: Rbeta
 !   real(8),dimension(Norb)              :: dens
 !   !
 !   do ispin=1,Nspin
 !      nca_dens = 0d0
 !      do iorb=1,Norb
 !         Matrix = matmul(CDGoperator(ispin,iorb)%Op,Coperator(ispin,iorb)%Op)
-!         do is=1,Nhilbert
+!         do is=1,Nfock
 !            nca_dens(iorb)= nca_dens(iorb) + Rbeta(is)*Matrix(is,is)/zeta_function
 !         enddo
 !      enddo
@@ -185,7 +188,7 @@ END MODULE NCA_OBSERVABLES
 !      do iorb=1,Norb
 !         Matrix = matmul(CDGoperator(ispin,iorb)%Op,Coperator(ispin,iorb)%Op)
 !         Matrix = matmul(ncaR(:,:,Ltau),Matrix)
-!         do is=1,Nhilbert
+!         do is=1,Nfock
 !            dens(iorb)= dens(iorb) + Matrix(is,is)/zeta_function
 !         enddo
 !      enddo

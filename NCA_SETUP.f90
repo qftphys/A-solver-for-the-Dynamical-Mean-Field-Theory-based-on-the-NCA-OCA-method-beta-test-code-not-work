@@ -7,32 +7,25 @@ MODULE NCA_SETUP
   USE SF_MISC, only: assert_shape
   !
   implicit none
-  !private
+  private
 
-  interface set_Hloc
-     module procedure :: set_Hloc_nn
-     module procedure :: set_Hloc_so
-  end interface set_Hloc
+  interface print_state_vector
+     module procedure print_state_vector_ivec
+  end interface print_state_vector
+
 
 
   public :: nca_init_structure
   !
   public :: setup_pointers
   public :: build_sector
+  public :: delete_sector
   public :: bdecomp
   public :: binary_search
   !
-  public :: set_Hloc
-  public :: print_Hloc
-  !
   public :: c
   public :: cdg
-  public :: build_c_operator
-  public :: build_cdg_operator
   public :: nca_build_operators
-  !
-  public :: setup_eigenspace
-  public :: reset_eigenspace
 
 contains
 
@@ -54,19 +47,18 @@ contains
     !
     Nsectors = (Ns+1)*(Ns+1) !nup=0:Ns;ndw=0:Ns
     !    
-    Nhilbert = 2**Nlevels
+    Nfock = 2**Nlevels
     !
     nup=Ns/2
     ndw=Ns-nup
     NP=get_sector_dimension(nup,ndw)
     !
     write(LOGfile,"(A)")"Summary:"
-    write(LOGfile,"(A)")"--------------------------------------------"
-    write(LOGfile,"(A,I15)")'# of levels/spin      = ',Ns
-    write(LOGfile,"(A,I15)")'Total system size     = ',Nlevels
-    write(LOGfile,"(A,I15)")'Fock space dimension  = ',Nhilbert
-    write(LOGfile,"(A,I15)")'Number of sectors     = ',Nsectors
-    write(LOGfile,"(A,2I15)")'Largest Sector(s)    = ',NP
+    write(LOGfile,"(A,I15)") '# of levels/spin      = ',Ns
+    write(LOGfile,"(A,I15)") 'Total system size     = ',Nlevels
+    write(LOGfile,"(A,I15)") 'Fock space dimension  = ',Nfock
+    write(LOGfile,"(A,I15)") 'Number of sectors     = ',Nsectors
+    write(LOGfile,"(A,2I15)")'Largest Sector(s)     = ',NP
     write(LOGfile,"(A)")"--------------------------------------------"
 
 
@@ -75,35 +67,44 @@ contains
 
 
     !Allocate pointers
-    allocate(impIndex(2,Norb))
     allocate(getdim(Nsectors),getnup(Nsectors),getndw(Nsectors))
     allocate(getsector(0:Ns,0:Ns))
 
+    allocate(getCsector(2,Nsectors));getCsector=0
+    allocate(getCDGsector(2,Nsectors));getCDGsector=0
 
     !Some check:
-    if(Nspin>=2)stop "Nspin > 2 ERROR. ask developer or develop your own on separate branch..."
-    if(Norb>3)stop "Norb > 3 ERROR. ask developer or develop your own on separate branch..." 
+    write(LOGfile,*) "WARNING: this code only works for multi-orbital diagonal problems, no mixed-GF are evaluated"
+    call sleep(1)
+    if(Nspin>2)stop "Nspin > 2 ERROR. ask developer or develop your own on separate branch..."
+    if(Norb>2)stop "Norb > 2 ERROR. ask developer or develop your own on separate branch..." 
 
 
     !allocate nca_delta
-    allocate(NcaDeltaAnd_tau(Nspin,Nspin,Norb,Norb,0:Ltau))
-    allocate(NcaDeltaAnd_iw(Nspin,Nspin,Norb,Norb,Lmats))
+    allocate(NcaDeltaAnd_tau(Nspin,Nspin,Norb,Norb,0:Ltau));NcaDeltaAnd_tau=0d0
+    allocate(NcaDeltaAnd_iw(Nspin,Nspin,Norb,Norb,Lmats));NcaDeltaAnd_iw=zero
 
     !allocate atomic propagators
-    allocate(ncaR0(Nhilbert,Nhilbert,0:Ltau))
-    allocate(ncaR(Nhilbert,Nhilbert,0:Ltau))
+    allocate(ncaR0(Nfock,Nfock,0:Ltau));ncaR0=0d0
+    allocate(ncaR(Nfock,Nfock,0:Ltau));ncaR=0d0
+
+    allocate(EigBasis(Nfock,Nfock));EigBasis=0d0
+    allocate(EigValues(Nfock));EigValues=0d0
 
     !allocate observables:
-    allocate(nca_dens(Norb))
-    allocate(nca_dens_up(Norb))
-    allocate(nca_dens_dw(Norb))
-    allocate(nca_docc(Norb))
-    allocate(nca_sz2(Norb))
+    allocate(nca_dens(Norb));nca_dens=0d0
+    allocate(nca_dens_up(Norb));nca_dens_up=0d0
+    allocate(nca_dens_dw(Norb));nca_dens_dw=0d0
+    allocate(nca_docc(Norb));nca_docc=0d0
+    allocate(nca_sz2(Norb));nca_sz2=0d0
+    allocate(nca_zeta(Nspin,Norb));nca_zeta=0d0
 
 
     !allocate functions
     allocate(impSmats(Nspin,Nspin,Norb,Norb,Lmats))
+    allocate(impStail(Nspin,Nspin,Norb,Norb,Lmats))
     allocate(impGmats(Nspin,Nspin,Norb,Norb,Lmats))
+    allocate(impG0mats(Nspin,Nspin,Norb,Norb,Lmats))
 
     !allocate memory for operators
     allocate(Coperator(2,Norb))
@@ -115,73 +116,6 @@ contains
 
 
 
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine set_Hloc_nn(Hloc)
-    complex(8),dimension(:,:,:,:) :: Hloc ![Nspin][Nspin][Norb][Norb]
-    call assert_shape(Hloc,[Nspin,Nspin,Norb,Norb],"set_Hloc_nn","Hloc")
-    !
-    impHloc = Hloc
-    !
-    write(LOGfile,"(A)")"Set Hloc: done"
-    call print_Hloc(impHloc)
-  end subroutine set_Hloc_nn
-
-  subroutine set_Hloc_so(hloc)
-    complex(8),dimension(:,:) :: Hloc ![Nspin*Norb][Nspin*Norb]
-    integer :: iorb,jorb
-    integer :: ispin,jspin
-    integer :: is,js
-    call assert_shape(Hloc,[Nspin*Norb,Nspin*Norb],"set_Hloc_so","Hloc")
-    !
-    do ispin=1,Nspin
-       do jspin=1,Nspin
-          do iorb=1,Norb
-             do jorb=1,Norb
-                is = iorb + (ispin-1)*Norb 
-                js = jorb + (jspin-1)*Norb 
-                impHloc(ispin,jspin,iorb,jorb) = Hloc(is,js)
-             enddo
-          enddo
-       enddo
-    enddo
-    !
-    write(LOGfile,"(A)")"Set Hloc: done"
-    call print_Hloc(impHloc)
-  end subroutine set_Hloc_so
-
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine print_Hloc(hloc,file)
-    complex(8),dimension(Nspin,Nspin,Norb,Norb) :: hloc
-    character(len=*),optional                   :: file
-    integer                                     :: ilat,jlat
-    integer                                     :: iorb,jorb
-    integer                                     :: ispin,jspin
-    integer                                     :: unit
-    character(len=32)                           :: fmt
-    !
-    unit=LOGfile;
-    !
-    if(present(file))then
-       open(free_unit(unit),file=reg(file))
-       write(LOGfile,"(A)")"print_Hloc to file :"//reg(file)
-    endif
-    write(fmt,"(A,I0,A)")"(",Nspin*Norb,"A)"
-    do ispin=1,Nspin
-       do iorb=1,Norb
-          write(unit,fmt)((str(Hloc(ispin,jspin,iorb,jorb)),jorb=1,Norb),jspin=1,Nspin)
-       enddo
-    enddo
-    write(unit,*)""
-    if(present(file))close(unit)
-  end subroutine print_Hloc
-
-
 
 
 
@@ -190,10 +124,9 @@ contains
   !PURPOSE  : 
   !+------------------------------------------------------------------+
   subroutine setup_pointers
-    integer                          :: ispin,dim,isector
-    integer                          :: nup,ndw,iorb
+    integer                          :: ispin,dim,isector,jsector
+    integer                          :: nup,ndw,iorb,iup,jup,idw,jdw
     write(*,"(A)")"Setting up pointers:"
-    call start_timer
     isector=0
     do nup=0,Ns
        do ndw=0,Ns
@@ -205,12 +138,35 @@ contains
           getdim(isector)=dim
        enddo
     enddo
-    call stop_timer
 
-    do ispin=1,2
-       do iorb=1,Norb
-          impIndex(ispin,iorb)=iorb+(ispin-1)*Ns
-       enddo
+    getCsector=0
+    do isector=1,Nsectors
+       nup=getnup(isector);ndw=getndw(isector)
+       jup=nup-1;jdw=ndw;if(jup < 0)cycle
+       jsector=getsector(jup,jdw)
+       getCsector(1,isector)=jsector
+    enddo
+    !
+    do isector=1,Nsectors
+       nup=getnup(isector);ndw=getndw(isector)
+       jup=nup;jdw=ndw-1;if(jdw < 0)cycle
+       jsector=getsector(jup,jdw)
+       getCsector(2,isector)=jsector
+    enddo
+    !
+    getCDGsector=0
+    do isector=1,Nsectors
+       nup=getnup(isector);ndw=getndw(isector)
+       jup=nup+1;jdw=ndw;if(jup > Ns)cycle
+       jsector=getsector(jup,jdw)
+       getCDGsector(1,isector)=jsector
+    enddo
+    !
+    do isector=1,Nsectors
+       nup=getnup(isector);ndw=getndw(isector)
+       jup=nup;jdw=ndw+1;if(jdw > Ns)cycle
+       jsector=getsector(jup,jdw)
+       getCDGsector(2,isector)=jsector
     enddo
   end subroutine setup_pointers
 
@@ -225,10 +181,9 @@ contains
   subroutine build_sector(isector,Hup)
     integer                                      :: isector
     type(sector_map)                             :: Hup
-    integer                                      :: nup,ndw,sz,nt,twoJz
-    integer                                      :: nup_,ndw_,sz_,nt_
-    integer                                      :: twoSz_,twoLz_
-    integer                                      :: i,ibath,iorb
+    integer                                      :: nup,ndw
+    integer                                      :: nup_,ndw_
+    integer                                      :: i
     integer                                      :: iup,idw
     integer                                      :: dim
     integer                                      :: ivec(Ns),jvec(Ns)
@@ -255,10 +210,9 @@ contains
 
 
 
-  subroutine delete_sector(isector,Hup)!,Hdw)
+  subroutine delete_sector(isector,Hup)
     integer                   :: isector
     type(sector_map)          :: Hup
-    ! type(sector_map),optional :: Hdw
     call map_deallocate(Hup)
   end subroutine delete_sector
 
@@ -277,13 +231,29 @@ contains
     logical :: busy
     !this is the configuration vector |1,..,Ns,Ns+1,...,Ntot>
     !obtained from binary decomposition of the state/number i\in 2^Ntot
-    do l=0,Ntot-1
-       busy=btest(i,l)
-       ivec(l+1)=0
-       if(busy)ivec(l+1)=1
+    do l=1,Ntot
+       busy=btest(i,l-1)
+       ivec(l)=0
+       if(busy)ivec(l)=1
     enddo
   end function bdecomp
 
+
+
+  !+------------------------------------------------------------------+
+  !PURPOSE  : input a vector ib(Nlevels) with the binary sequence 
+  ! and output the corresponding state |i>
+  !(corresponds to the recomposition of the number i-1)
+  !+------------------------------------------------------------------+
+  function bjoin(ib,Ntot) result(i)
+    integer                 :: Ntot
+    integer,dimension(Ntot) :: ib
+    integer                 :: i,j
+    i=0
+    do j=0,Ntot-1
+       i=i+ib(j+1)*2**j
+    enddo
+  end function bjoin
 
 
 
@@ -326,62 +296,167 @@ contains
 
 
   !+-------------------------------------------------------------------+
-  !PURPOSE  : input state |i> of the basis and calculates |j>=C/Cm+|i>
-  !the sign of j has the phase convention
-  !m labels the sites
+  !PURPOSE  : build <j|C|i> with j,i \in FockBasis
   !+-------------------------------------------------------------------+
-  subroutine build_c_operator(ispin,iorb,Cmat)
+  subroutine build_c_operator_fock(ispin,iorb,Cmat)
     integer                              :: ispin,iorb
-    real(8),dimension(Nhilbert,Nhilbert) :: Cmat
-    integer                              :: imp,i,j
-    integer                              :: ib(Nlevels)
-    real(8)                              :: c_
-    !build <j|C|i>
-    imp = impIndex(ispin,iorb)
+    real(8),dimension(Nfock,Nfock) :: Cmat
+    integer                              :: imp,i,j,iup,idw
+    integer                              :: ivec(Nlevels)
+    real(8)                              :: c_,c_op,c_sgn
+    imp = iorb+(ispin-1)*Ns
     Cmat=0d0
-    do i=0,Nhilbert-1
-       ib =  bdecomp(i,2*Ns)
-       if(ib(imp)==0)cycle
-       call c(imp,i,j,c_)
-       Cmat(i+1,j+1)=c_
-    enddo
-    return
-  end subroutine build_c_operator
-
-
-  subroutine build_cdg_operator(ispin,iorb,Cmat)
-    integer                              :: ispin,iorb
-    real(8),dimension(Nhilbert,Nhilbert) :: Cmat
-    integer                              :: imp,i,j
-    integer                              :: ib(Nlevels)
-    real(8)                              :: c_
-    !build <j|C|i>
-    imp = impIndex(ispin,iorb)
-    Cmat=0d0
-    do i=0,Nhilbert-1
-       ib =  bdecomp(i,2*Ns)
-       if(ib(imp)==1)cycle
-       call cdg(imp,i,j,c_)
-       Cmat(i+1,j+1)=c_
-    enddo
-    return
-  end subroutine build_cdg_operator
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine nca_build_operators
-    integer :: ispin,iorb,NN
-    NN = Nhilbert
-    do ispin=1,2
-       do iorb=1,Norb
-          allocate(Coperator(ispin,iorb)%Op(NN,NN))
-          allocate(CDGoperator(ispin,iorb)%Op(NN,NN))
-          call build_c_operator(ispin,iorb,Coperator(ispin,iorb)%Op(:,:))
-          CDGoperator(ispin,iorb)%Op(:,:)=transpose(Coperator(ispin,iorb)%Op(:,:))
+    do idw=0,2**Ns-1
+       do iup=0,2**Ns-1
+          i = iup + idw*2**Ns
+          ivec = bdecomp(i,2*Ns)
+          if(ivec(imp)==0)cycle
+          call c(imp,i,j,c_)
+          Cmat(i+1,j+1) = c_
        enddo
     enddo
+  end subroutine build_c_operator_fock
+
+  subroutine build_cdg_operator_fock(ispin,iorb,Cmat)
+    integer                              :: ispin,iorb
+    real(8),dimension(Nfock,Nfock) :: Cmat
+    integer                              :: imp,i,j,iup,idw
+    integer                              :: ivec(Nlevels)
+    real(8)                              :: c_
+    imp = iorb+(ispin-1)*Ns
+    Cmat=0d0
+    do idw=0,2**Ns-1
+       do iup=0,2**Ns-1
+          i = iup + idw*2**Ns
+          ivec = bdecomp(i,2*Ns)
+          if(ivec(imp)==1)cycle
+          call cdg(imp,i,j,c_)
+          Cmat(i+1,j+1) = c_
+       enddo
+    enddo
+  end subroutine build_cdg_operator_fock
+
+
+
+
+
+  !+-------------------------------------------------------------------+
+  !PURPOSE:
+  !+-------------------------------------------------------------------+
+  subroutine build_c_operator_eig(ispin,iorb,Cmat)
+    integer                        :: ispin,iorb
+    real(8),dimension(Nfock,Nfock) :: Cmat
+    real(8),dimension(Nfock)       :: avec,bvec
+    real(8)                        :: c_,Dab
+    integer                        :: imp,i,j,ia,ib,iia,iib
+    integer                        :: ivec(Nlevels)
+    !
+    imp = iorb+(ispin-1)*Norb
+    !
+    Cmat=0d0
+    !
+    do ib=1,Nfock               !loop over |b> states
+       do ia=1,Nfock            !loop over <a| states
+          Dab=0d0
+          do iib=0,Nfock-1        !now loop over the components of |b>=\sum_iib u^b_iib |iib>
+             ivec = bdecomp(iib,2*Ns)
+             if(ivec(imp) == 0) cycle
+             call c(imp,iib,iia,c_)
+             Dab = Dab + EigBasis(ia,iia+1)*c_*EigBasis(iib+1,ib)
+          enddo
+          Cmat(ia,ib) = Cmat(ia,ib) + Dab
+       enddo
+    enddo
+  end subroutine build_c_operator_eig
+
+
+  subroutine build_cdg_operator_eig(ispin,iorb,Cmat)
+    integer                        :: ispin,iorb
+    real(8),dimension(Nfock,Nfock) :: Cmat
+    real(8),dimension(Nfock)       :: avec,bvec
+    real(8)                        :: c_,Dab
+    integer                        :: imp,i,j,ia,ib,iia,iib
+    integer                        :: ivec(Nlevels)
+    !
+    imp = iorb+(ispin-1)*Norb
+    !
+    Cmat=0d0
+    !
+    do ib=1,Nfock               !loop over |b> states
+       do ia=1,Nfock            !loop over <a| states
+          Dab=0d0
+          do iib=0,Nfock-1        !now loop over the components of |b>=\sum_iib u^b_iib |iib>
+             ivec = bdecomp(iib,2*Ns)
+             if(ivec(imp) == 1) cycle
+             call cdg(imp,iib,iia,c_)
+             Dab = Dab + EigBasis(ia,iia+1)*c_*EigBasis(iib+1,ib)
+          enddo
+          Cmat(ia,ib) = Cmat(ia,ib) + Dab
+       enddo
+    enddo
+  end subroutine build_cdg_operator_eig
+
+
+
+
+  !+------------------------------------------------------------------+
+  !Purpose  : 
+  !+------------------------------------------------------------------+
+  subroutine nca_build_operators
+    integer                              :: ispin,iorb,i,j,isector
+    integer                              :: ivec(2*Ns),stride,dim
+
+    do ispin=1,2
+       do iorb=1,Norb
+          allocate(Coperator(ispin,iorb)%Op(Nfock,Nfock))
+          Coperator(ispin,iorb)%Op(:,:)=0d0
+          call build_c_operator_eig(ispin,iorb,Coperator(ispin,iorb)%Op)
+          !
+          allocate(CDGoperator(ispin,iorb)%Op(Nfock,Nfock))
+          CDGoperator(ispin,iorb)%Op=0d0
+          call build_cdg_operator_eig(ispin,iorb,CDGoperator(ispin,iorb)%Op)
+       enddo
+    enddo
+    !
+    ! ispin=1
+    ! do iorb=1,Norb
+    !    write(*,*)""
+    !    write(*,*)"C_l"//str(iorb)//"_s"//str(ispin)
+    !    do i=1,Nfock
+    !       ivec = bdecomp(i-1,2*Ns)
+    !       write(800,"(I9,A1,100I1)",advance="no")i-1," | ",(ivec(j),j=1,2*Ns)
+    !       write(800,"(1000F9.2)")(Coperator(ispin,iorb)%Op(i,j),j=1,Nfock)
+    !    enddo
+    !    write(*,*)""
+    !    write(*,*)"Cdg_l"//str(iorb)//"_s"//str(ispin)
+    !    do i=1,Nfock
+    !       ivec = bdecomp(i-1,2*Ns)
+    !       write(801,"(I9,A1,100I1)",advance="no")i-1," | ",(ivec(j),j=1,2*Ns)
+    !       write(801,"(1000F9.2)")(CDGoperator(ispin,iorb)%Op(i,j),j=1,Nfock)
+    !    enddo
+    !    write(*,*)""
+    ! enddo
+    ! !
+    ! ispin=2
+    ! do iorb=1,Norb
+    !    write(*,*)""
+    !    write(*,*)"C_l"//str(iorb)//"_s"//str(ispin)
+    !    do i=1,Nfock
+    !       ivec = bdecomp(i-1,2*Ns)
+    !       write(802,"(I9,A1,100I1)",advance="no")i-1," | ",(ivec(j),j=1,2*Ns)
+    !       write(802,"(1000F9.2)")(Coperator(ispin,iorb)%Op(i,j),j=1,Nfock)
+    !    enddo
+    !    write(*,*)""
+    !    write(*,*)"Cdg_l"//str(iorb)//"_s"//str(ispin)
+    !    do i=1,Nfock
+    !       ivec = bdecomp(i-1,2*Ns)
+    !       write(803,"(I9,A1,100I1)",advance="no")i-1," | ",(ivec(j),j=1,2*Ns)
+    !       write(803,"(1000F9.2)")(CDGoperator(ispin,iorb)%Op(i,j),j=1,Nfock)
+    !    enddo
+    !    write(*,*)""
+    ! enddo
+
+
   end subroutine nca_build_operators
 
 
@@ -449,31 +524,28 @@ contains
 
 
 
-  !+------------------------------------------------------------------+
-  !PURPOSE  : 
-  !+------------------------------------------------------------------+
-  subroutine setup_eigenspace
-    integer :: isector,dim
-    if(allocated(espace)) deallocate(espace)
-    allocate(espace(1:Nsectors))
-    do isector=1,Nsectors
-       dim=getdim(isector)
-       allocate(espace(isector)%e(dim),espace(isector)%H(dim,dim))
-    enddo
-  end subroutine setup_eigenspace
 
 
 
   !+------------------------------------------------------------------+
-  !PURPOSE  : 
+  !PURPOSE  : print a state vector |{up}>|{dw}>
   !+------------------------------------------------------------------+
-  subroutine reset_eigenspace
-    integer :: isector
-    forall(isector=1:Nsectors)
-       espace(isector)%E=0.d0
-       espace(isector)%H=0.d0
-    end forall
-  end subroutine reset_eigenspace
+  subroutine print_state_vector_ivec(ivec,unit)
+    integer,intent(in) :: ivec(:)
+    integer,optional   :: unit
+    integer            :: unit_
+    integer            :: i,j,Ntot
+    character(len=2)   :: fbt
+    character(len=16)  :: fmt
+    unit_=6;if(present(unit))unit_=unit
+    Ntot = size(ivec)
+    i= bjoin(ivec,Ntot)
+    write(unit_,"(I9,1x,A1)",advance="no")i,"|"
+    write(unit_,"(10I1)",advance="no")(ivec(j),j=1,Ntot)
+    write(unit_,"(A4)",advance="yes")">"
+  end subroutine print_state_vector_ivec
+  !
+
 
 
 END MODULE NCA_SETUP
