@@ -26,3 +26,4 @@ Makefile
 cmake_install.cmake
 nca_setup.mod
 *.o
+nca_observables.mod

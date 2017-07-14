@@ -57,7 +57,7 @@ endif
 ###############################################################################
 
 
-OBJS= NCA_VARS_GLOBAL.o NCA_SETUP.o NCA_DIAG.o NCA_GREENS_FUNCTIONS.o NCA_MAIN.o DMFT_NCA.o
+OBJS= NCA_INPUT_VARIABLES.o CA_VARS_GLOBAL.o NCA_SETUP.o NCA_DIAG.o NCA_GREENS_FUNCTIONS.o NCA_MAIN.o DMFT_NCA.o
 
 all: all version compile completion
 debug: debug version compile completion

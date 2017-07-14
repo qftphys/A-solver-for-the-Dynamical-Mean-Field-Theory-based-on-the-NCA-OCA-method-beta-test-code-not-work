@@ -28,41 +28,55 @@ contains
   ! GS, build the Green's functions calling all the necessary routines
   !+-------------------------------------------------------------------+
   subroutine nca_diagonalize_hlocal
-    integer                     :: i,j,isector,dim,unit,nup,ndw
-    real(8),dimension(Nsectors) :: e0 
-    real(8)                     :: egs
-    e0=0.d0
+    integer                            :: i,j,isector,dim,unit,stride
+    real(8),dimension(Nsectors)        :: e0 
+    real(8)                            :: egs,zeta_function_diag
+    real(8),dimension(:,:),allocatable :: Hmat
+    real(8),dimension(:),allocatable   :: Eval
+    !
+    e0=0d0
+    !
     write(LOGfile,"(A)")"Diagonalizing Hamiltonian:"
     call start_timer
+    stride=0
+    EigBasis=0d0
+    EigValues=0d0
     do isector=1,Nsectors
-       nup  = getnup(isector)
-       ndw  = getndw(isector)
-       write(LOGfile,"(A,I4,A6,I2,A6,I2,A6,I15)")&
-            "Solving sector:",isector,", nup:",nup,", ndw:",ndw,", dim=",getdim(isector)
        dim=getdim(isector)
-       call build_hlocal(isector,espace(isector)%H(:,:))
-       call eigh(espace(isector)%H,espace(isector)%e,'V','U')
-       e0(isector)=minval(espace(isector)%e)
+       !
+       allocate(Hmat(dim,dim));Hmat=0d0
+       allocate(Eval(dim));Eval=0d0
+       !
+       call build_hlocal(isector,Hmat)
+       call eigh(Hmat,Eval,'V','U')
+       !
+       e0(isector)=minval(Eval)
+       !
+       write(LOGfile,"(A,F15.8)")&
+            "Solving sector: "//str(isector)//&
+            ", nup:"//str(getnup(isector))//", ndw:"//str(getndw(isector))//&
+            ", dim="//str(getdim(isector))//&
+            ", Egs=",e0(isector)
+       !
+       EigBasis(stride+1:stride+dim,stride+1:stride+dim) = Hmat(:,:)
+       EigValues(stride+1:stride+dim)                    = Eval
+       !
+       stride=stride+dim
+       !
+       deallocate(Hmat)
+       deallocate(Eval)
     enddo
     call stop_timer
     !
-    egs=minval(e0)
-    forall(isector=1:Nsectors)espace(isector)%e = espace(isector)%e - egs
+
     !Get the partition function Z and rescale energies
-    zeta_function_diag=0d0
-    do isector=1,Nsectors
-       dim=getdim(isector)
-       do i=1,dim
-          zeta_function_diag=zeta_function_diag+exp(-beta*espace(isector)%e(i))
-       enddo
-    enddo
+    Egs=minval(e0)
+    EigValues = EigValues - Egs
+    zeta_function_diag=sum(exp(-beta*EigValues(:)))
+    !
     write(LOGfile,"(A)")"DIAG summary:"
-    write(LOGfile,"(A,f20.12)")'egs  =',egs
+    write(LOGfile,"(A,f20.12)")'Egs  =',Egs
     write(LOGfile,"(A,f20.12)")'Z    =',zeta_function_diag
-    unit=free_unit()
-    open(unit,file="Egs.nca")
-    write(unit,*)egs
-    close(unit)
     return
   end subroutine nca_diagonalize_hlocal
 
@@ -105,7 +119,6 @@ contains
     !-----------------------------------------------!
     states: do i=1,Dim
        m = H%map(i)
-       impi = i
        ib = bdecomp(m,2*Ns)
        !
        do iorb=1,Norb
@@ -124,7 +137,7 @@ contains
           htmp = htmp + dreal(impHloc(Nspin,Nspin,iorb,iorb))*ndw(iorb)
        enddo
        !
-       Hmat(impi,i)=Hmat(impi,i)+htmp
+       Hmat(i,i)=Hmat(i,i)+htmp
        !
        !
        !Density-density interaction: same orbital, opposite spins
@@ -168,7 +181,7 @@ contains
           endif
        endif
        !
-       Hmat(impi,i)=Hmat(impi,i)+htmp
+       Hmat(i,i)=Hmat(i,i)+htmp
        !
        !
        !
@@ -192,7 +205,7 @@ contains
                    j=binary_search(Hmap,k4)
                    htmp = Jx*sg1*sg2*sg3*sg4
                    !
-                   if(j/=0)Hmat(impi,j)=Hmat(impi,j)+htmp
+                   if(j/=0)Hmat(i,j)=Hmat(i,j)+htmp
                    !
                 endif
              enddo
@@ -219,7 +232,7 @@ contains
                    j=binary_search(Hmap,k4)
                    htmp = Jp*sg1*sg2*sg3*sg4
                    !
-                   if(j/=0)Hmat(impi,j)=Hmat(impi,j)+htmp
+                   if(j/=0)Hmat(i,j)=Hmat(i,j)+htmp
                    !
                 endif
              enddo

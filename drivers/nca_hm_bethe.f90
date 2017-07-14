@@ -32,9 +32,10 @@ program nca_hm_bethe
   call add_ctrl_var(xmu,"xmu")
 
 
-  allocate(He(1,1,Le),Wte(Le))
-  He(1,1,:) = linspace(-Wband,Wband,Le,mesh=de)
-  Wte       = dens_bethe(He(1,1,:),wband)*de
+  allocate(He(Nspin*Norb,Nspin*Norb,Le),Wte(Le))
+  He(1,1,:)         = linspace(-Wband,Wband,Le,mesh=de)
+  He(Nspin,Nspin,:) = linspace(-Wband,Wband,Le,mesh=de)
+  Wte               = dens_bethe(He(1,1,:),wband)*de
 
 
   !Allocate Fields:
@@ -55,7 +56,7 @@ program nca_hm_bethe
      dmft_loop=dmft_loop+1
      call start_loop(dmft_loop,nloop,"DMFT-loop")
 
-     call nca_solver(Delta)
+     call nca_solve(Delta)
      Smats = impSmats !??
 
      ! compute the local gf:
