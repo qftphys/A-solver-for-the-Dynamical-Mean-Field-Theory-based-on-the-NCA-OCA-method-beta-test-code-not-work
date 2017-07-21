@@ -82,8 +82,7 @@ MODULE NCA_VARS_GLOBAL
   !Density and double occupancy
   !=========================================================
   real(8),dimension(:),allocatable                        ::  nca_dens
-  real(8),dimension(:),allocatable                        ::  nca_dens_up
-  real(8),dimension(:),allocatable                        ::  nca_dens_dw
+  real(8),dimension(:,:),allocatable                      ::  nca_dens_spin
   real(8),dimension(:),allocatable                        ::  nca_docc
   real(8),dimension(:),allocatable                        ::  nca_sz2
   real(8),dimension(:,:),allocatable                      ::  nca_zeta

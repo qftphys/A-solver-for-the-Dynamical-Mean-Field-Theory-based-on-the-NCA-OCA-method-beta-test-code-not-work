@@ -3,9 +3,8 @@ module NCA_DIAG
   USE NCA_SETUP
   !
   USE SF_CONSTANTS,only: one,xi,zero,pi
-  USE SF_TIMER
-  USE SF_IOTOOLS,  only: free_unit,reg,str
-  USE SF_ARRAYS,   only: arange,linspace
+  USE SF_TIMER,    only: start_timer,stop_timer
+  USE SF_IOTOOLS,  only: str
   USE SF_LINALG,   only: eigh
   USE SF_MISC,     only: assert_shape
   !
@@ -48,27 +47,23 @@ contains
        allocate(Eval(dim));Eval=0d0
        !
        call build_hlocal(isector,Hmat)
-       call eigh(Hmat,Eval,'V','U')
+       call eigh(Hmat,Eval)
        !
        e0(isector)=minval(Eval)
        !
-       write(LOGfile,"(A,F15.8)")&
-            "Solving sector: "//str(isector)//&
+       write(LOGfile,"(A,F15.8)")"Solving sector: "//&
             ", nup:"//str(getnup(isector))//", ndw:"//str(getndw(isector))//&
-            ", dim="//str(getdim(isector))//&
-            ", Egs=",e0(isector)
+            ", dim="//str(getdim(isector))//", Egs=",e0(isector)
        !
        EigBasis(stride+1:stride+dim,stride+1:stride+dim) = Hmat(:,:)
        EigValues(stride+1:stride+dim)                    = Eval
        !
        stride=stride+dim
        !
-       deallocate(Hmat)
-       deallocate(Eval)
+       deallocate(Hmat,Eval)
     enddo
     call stop_timer
     !
-
     !Get the partition function Z and rescale energies
     Egs=minval(e0)
     EigValues = EigValues - Egs
@@ -77,7 +72,6 @@ contains
     write(LOGfile,"(A)")"DIAG summary:"
     write(LOGfile,"(A,f20.12)")'Egs  =',Egs
     write(LOGfile,"(A,f20.12)")'Z    =',zeta_function_diag
-    return
   end subroutine nca_diagonalize_hlocal
 
 
@@ -96,15 +90,13 @@ contains
   subroutine build_hlocal(isector,Hmat)
     real(8),dimension(:,:)           :: Hmat
     integer                          :: isector
-    integer,dimension(:),allocatable :: Hmap    !map of the Sector S to Hilbert space H
     integer,dimension(Nlevels)       :: ib
     integer                          :: dim
-    integer                          :: i,j,m,iorb,jorb,ispin,impi,ishift
+    integer                          :: i,j,m,iorb,jorb,ispin
     integer                          :: k1,k2,k3,k4
     real(8)                          :: sg1,sg2,sg3,sg4
     real(8),dimension(Norb)          :: nup,ndw
     real(8)                          :: htmp
-    real(8),dimension(Nspin,Norb)    :: eloc
     logical                          :: Jcondition
     type(sector_map)                 :: H
     !
@@ -202,7 +194,7 @@ contains
                    call c(iorb+Ns,k1,k2,sg2)
                    call cdg(jorb+Ns,k2,k3,sg3)
                    call cdg(iorb,k3,k4,sg4)
-                   j=binary_search(Hmap,k4)
+                   j=binary_search(H%map,k4)
                    htmp = Jx*sg1*sg2*sg3*sg4
                    !
                    if(j/=0)Hmat(i,j)=Hmat(i,j)+htmp
@@ -229,7 +221,7 @@ contains
                    call c(jorb+Ns,k1,k2,sg2)
                    call cdg(iorb+Ns,k2,k3,sg3)
                    call cdg(iorb,k3,k4,sg4)
-                   j=binary_search(Hmap,k4)
+                   j=binary_search(H%map,k4)
                    htmp = Jp*sg1*sg2*sg3*sg4
                    !
                    if(j/=0)Hmat(i,j)=Hmat(i,j)+htmp

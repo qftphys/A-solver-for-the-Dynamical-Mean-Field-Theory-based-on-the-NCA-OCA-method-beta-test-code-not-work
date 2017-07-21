@@ -22,6 +22,7 @@ program nca_bhz
   logical                :: converged
   !The local hybridization function:
   complex(8),allocatable :: Delta(:,:,:,:,:)
+  complex(8),allocatable :: Delta_prev(:,:,:,:,:)
   complex(8),allocatable :: Smats(:,:,:,:,:)
   complex(8),allocatable :: Gmats(:,:,:,:,:)
   !hamiltonian input:
@@ -58,7 +59,8 @@ program nca_bhz
   Nso=Nspin*Norb
 
   !Allocate Weiss Field:
-  allocate(delta(Nspin,Nspin,Norb,Norb,Lmats))
+  allocate(Delta(Nspin,Nspin,Norb,Norb,Lmats))
+  allocate(Delta_prev(Nspin,Nspin,Norb,Norb,Lmats))
   allocate(Smats(Nspin,Nspin,Norb,Norb,Lmats))
   allocate(Gmats(Nspin,Nspin,Norb,Norb,Lmats))
 
@@ -69,7 +71,7 @@ program nca_bhz
   Smats=zero
   call dmft_gloc_matsubara(Hk,Wtk,Gmats,Smats,iprint=1)
   call dmft_delta(Gmats,Smats,Delta,Hloc=j2so(bhzHloc),iprint=0)
-
+  Delta_prev = Delta
 
   call nca_init_solver(Hloc=j2so(bhzHloc))
 
@@ -88,7 +90,10 @@ program nca_bhz
 
      call dmft_delta(Gmats,Smats,Delta,Hloc=j2so(bhzHloc),iprint=1)
 
-     converged = check_convergence(delta(1,1,1,1,:),dmft_error,nsuccess,nloop)
+     Delta = wmixing*Delta + (1d0-wmixing)*Delta_prev
+     Delta_prev = Delta
+     
+     converged = check_convergence(Delta(1,1,1,1,:),dmft_error,nsuccess,nloop)
 
      call end_loop
   enddo
