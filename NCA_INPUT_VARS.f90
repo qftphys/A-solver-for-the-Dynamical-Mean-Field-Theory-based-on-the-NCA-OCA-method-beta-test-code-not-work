@@ -63,12 +63,12 @@ contains
     call parse_input_variable(hfmode,"HFMODE",INPUTunit,default=.true.,comment="Flag to set the Hartree form of the interaction (n-1/2). see xmu.")
     !
     call parse_input_variable(nloop,"NLOOP",INPUTunit,default=100,comment="Max number of DMFT iterations.")
-    call parse_input_variable(dmft_error,"DMFT_ERROR",INPUTunit,default=0.00001d0,comment="Error threshold for DMFT convergence")
-    call parse_input_variable(nca_error,"NCA_ERROR",INPUTunit,default=1d-12,comment="Error threshold for the NCA cycle")
+    call parse_input_variable(dmft_error,"DMFT_ERROR",INPUTunit,default=1d-5,comment="Error threshold for DMFT convergence")
+    call parse_input_variable(nca_error,"NCA_ERROR",INPUTunit,default=1d-9,comment="Error threshold for the NCA cycle")
     call parse_input_variable(nsuccess,"NSUCCESS",INPUTunit,default=1,comment="Number of successive iterations below threshold for convergence")
     !
-    call parse_input_variable(Lmats,"LMATS",INPUTunit,default=2048,comment="Number of Matsubara frequencies.")
-    call parse_input_variable(Ltau,"LTAU",INPUTunit,default=512,comment="Number of imaginary time points.")
+    call parse_input_variable(Lmats,"LMATS",INPUTunit,default=8192,comment="Number of Matsubara frequencies.")
+    call parse_input_variable(Ltau,"LTAU",INPUTunit,default=256,comment="Number of imaginary time points.")
     call parse_input_variable(cutoff,"CUTOFF",INPUTunit,default=1.d-9,comment="Spectrum cut-off, used to determine the number states to be retained.")
     call parse_input_variable(gs_threshold,"GS_THRESHOLD",INPUTunit,default=1.d-9,comment="Energy threshold for ground state degeneracy loop up")
     call parse_input_variable(LOGfile,"LOGFILE",INPUTunit,default=6,comment="LOG unit.")

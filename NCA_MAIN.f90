@@ -41,11 +41,15 @@ contains
     real(8) :: tau(0:Ltau)
     write(LOGfile,"(A)")"START NCA SOLVER"
     NcaDeltaAnd_iw = Delta
-    do ispin=1,Nspin
-       do iorb=1,Norb
-          call fft_gf_iw2tau(NcaDeltaAnd_iw(ispin,ispin,iorb,iorb,:),&
-               NcaDeltaAnd_tau(ispin,ispin,iorb,iorb,0:),beta)
-       enddo
+    !SPIN UP:
+    ispin=1
+    do iorb=1,Norb
+       call fft_gf_iw2tau(Delta(ispin,ispin,iorb,iorb,:),NcaDeltaAnd_tau(1,1,iorb,iorb,0:),beta)
+    enddo
+    !SPIN DW:
+    ispin=min(2,Nspin)
+    do iorb=1,Norb
+       call fft_gf_iw2tau(Delta(ispin,ispin,iorb,iorb,:),NcaDeltaAnd_tau(2,2,iorb,iorb,0:),beta)
     enddo
     call nca_build_dressed_propagator !<-- get ncaR(tau)
     call nca_get_observables

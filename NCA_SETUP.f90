@@ -1,18 +1,8 @@
 MODULE NCA_SETUP
   USE NCA_VARS_GLOBAL
   !
-  USE SF_CONSTANTS, only:zero
-  USE SF_TIMER
-  USE SF_IOTOOLS, only:free_unit,reg,str
-  USE SF_MISC, only: assert_shape
-  !
   implicit none
   private
-
-  interface print_state_vector
-     module procedure print_state_vector_ivec
-  end interface print_state_vector
-
 
 
   public :: nca_init_structure
@@ -25,7 +15,16 @@ MODULE NCA_SETUP
   !
   public :: c
   public :: cdg
+  !
   public :: nca_build_operators
+  !
+  public :: build_dens_operator
+  public :: build_docc_operator
+  public :: build_sz2_operator
+
+
+  complex(8),parameter :: zero=dcmplx(0d0,0d0)
+
 
 contains
 
@@ -39,15 +38,13 @@ contains
   subroutine nca_init_structure()
     integer :: NP,nup,ndw,iorb,jorb,ispin,jspin
     !
-    !Norb=# of impurity orbitals
-    !Ns=total number of sites
     Ns       = Norb
     !
     Nlevels  = 2*Ns
     !
     Nsectors = (Ns+1)*(Ns+1) !nup=0:Ns;ndw=0:Ns
     !    
-    Nfock = 2**Nlevels
+    Nfock    = 2**Nlevels
     !
     nup=Ns/2
     ndw=Ns-nup
@@ -81,8 +78,8 @@ contains
 
 
     !allocate nca_delta
-    allocate(NcaDeltaAnd_tau(Nspin,Nspin,Norb,Norb,0:Ltau));NcaDeltaAnd_tau=0d0
-    allocate(NcaDeltaAnd_iw(Nspin,Nspin,Norb,Norb,Lmats));NcaDeltaAnd_iw=zero
+    allocate(NcaDeltaAnd_tau(2,2,Norb,Norb,0:Ltau));NcaDeltaAnd_tau=0d0
+    allocate(NcaDeltaAnd_iw(2,2,Norb,Norb,Lmats));NcaDeltaAnd_iw=zero
 
     !allocate atomic propagators
     allocate(ncaR0(Nfock,Nfock,0:Ltau));ncaR0=0d0
@@ -92,9 +89,8 @@ contains
     allocate(EigValues(Nfock));EigValues=0d0
 
     !allocate observables:
+    allocate(nca_dens_spin(2,Norb));nca_dens_spin=0d0
     allocate(nca_dens(Norb));nca_dens=0d0
-    allocate(nca_dens_up(Norb));nca_dens_up=0d0
-    allocate(nca_dens_dw(Norb));nca_dens_dw=0d0
     allocate(nca_docc(Norb));nca_docc=0d0
     allocate(nca_sz2(Norb));nca_sz2=0d0
     allocate(nca_zeta(Nspin,Norb));nca_zeta=0d0
@@ -178,42 +174,33 @@ contains
   !states i\in Hilbert_space from the states count in H_sector.
   !|ImpUP,BathUP>|ImpDW,BathDW >
   !+------------------------------------------------------------------+
-  subroutine build_sector(isector,Hup)
+  subroutine build_sector(isector,H)
     integer                                      :: isector
-    type(sector_map)                             :: Hup
+    type(sector_map)                             :: H
     integer                                      :: nup,ndw
     integer                                      :: nup_,ndw_
-    integer                                      :: i
-    integer                                      :: iup,idw
+    integer                                      :: istate
     integer                                      :: dim
-    integer                                      :: ivec(Ns),jvec(Ns)
+    integer                                      :: ivec(2*Ns)
     nup = getNup(isector)
     ndw = getNdw(isector)
     dim = getDim(isector)
-    call map_allocate(Hup,dim)
+    call map_allocate(H,dim)
     dim=0
-    do idw=0,2**Ns-1
-       jvec  = bdecomp(idw,Ns)
-       ndw_  = sum(jvec)
-       if(ndw_ /= ndw)cycle
-       do iup=0,2**Ns-1
-          ivec  = bdecomp(iup,Ns)
-          nup_  = sum(ivec)
-          if(nup_ /= nup)cycle
-          dim      = dim+1
-          Hup%map(dim) = iup + idw*2**Ns
-       enddo
+    do istate=1,Nfock
+       ivec=bdecomp(istate,2*Ns)
+       nup_=sum(ivec(1:Ns))
+       ndw_=sum(ivec(Ns+1:2*Ns))
+       if(nup_/=nup .OR. ndw_/=ndw)cycle
+       dim      = dim+1
+       H%map(dim) = istate
     enddo
   end subroutine build_sector
 
-
-
-
-
-  subroutine delete_sector(isector,Hup)
+  subroutine delete_sector(isector,H)
     integer                   :: isector
-    type(sector_map)          :: Hup
-    call map_deallocate(Hup)
+    type(sector_map)          :: H
+    call map_deallocate(H)
   end subroutine delete_sector
 
 
@@ -223,37 +210,25 @@ contains
 
   !+------------------------------------------------------------------+
   !PURPOSE  : input a state |i> and output a vector ivec(Nlevels)
-  !with its binary decomposition
-  !(corresponds to the decomposition of the number i-1)
+  !with its binary decomposition, corresponding to the number i-1.
   !+------------------------------------------------------------------+
   function bdecomp(i,Ntot) result(ivec)
-    integer :: Ntot,ivec(Ntot),l,i
+    integer :: i,Ntot
+    integer :: ivec(Ntot)
+    integer :: bit,istate
     logical :: busy
     !this is the configuration vector |1,..,Ns,Ns+1,...,Ntot>
-    !obtained from binary decomposition of the state/number i\in 2^Ntot
-    do l=1,Ntot
-       busy=btest(i,l-1)
-       ivec(l)=0
-       if(busy)ivec(l)=1
+    !obtained from binary decomposition of the state istate=[0,...,2^Ntot-1]
+    !remark: to respect the binary structure 0=|0...00...0> to Nfock=|1...11...1>
+    !one needs to btest the i-1 state to shift the 1...Nfock to 0...2^Ntot-1
+    istate=i-1
+    do bit=1,Ntot
+       busy=btest(istate,bit-1)
+       ivec(bit)=0
+       if(busy)ivec(bit)=1
     enddo
   end function bdecomp
 
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : input a vector ib(Nlevels) with the binary sequence 
-  ! and output the corresponding state |i>
-  !(corresponds to the recomposition of the number i-1)
-  !+------------------------------------------------------------------+
-  function bjoin(ib,Ntot) result(i)
-    integer                 :: Ntot
-    integer,dimension(Ntot) :: ib
-    integer                 :: i,j
-    i=0
-    do j=0,Ntot-1
-       i=i+ib(j+1)*2**j
-    enddo
-  end function bjoin
 
 
 
@@ -269,13 +244,14 @@ contains
     integer,intent(in)    :: in
     integer,intent(inout) :: out
     real(8),intent(inout) :: fsgn    
-    integer               :: l
-    if(.not.btest(in,pos-1))stop "C error: C_i|...0_i...>"
+    integer               :: l,instate
+    instate = in-1
+    if(.not.btest(instate,pos-1))stop "C error: C_i|...0_i...>"
     fsgn=1d0
     do l=1,pos-1
-       if(btest(in,l-1))fsgn=-fsgn
+       if(btest(instate,l-1))fsgn=-fsgn
     enddo
-    out = ibclr(in,pos-1)
+    out = ibclr(instate,pos-1) + 1
   end subroutine c
 
   subroutine cdg(pos,in,out,fsgn)
@@ -283,97 +259,53 @@ contains
     integer,intent(in)    :: in
     integer,intent(inout) :: out
     real(8),intent(inout) :: fsgn    
-    integer               :: l
-    if(btest(in,pos-1))stop "C^+ error: C^+_i|...1_i...>"
+    integer               :: l,instate
+    instate = in - 1
+    if(btest(instate,pos-1))stop "C^+ error: C^+_i|...1_i...>"
     fsgn=1d0
     do l=1,pos-1
-       if(btest(in,l-1))fsgn=-fsgn
+       if(btest(instate,l-1))fsgn=-fsgn
     enddo
-    out = ibset(in,pos-1)
+    out = ibset(instate,pos-1) + 1
   end subroutine cdg
 
 
 
 
-  !+-------------------------------------------------------------------+
-  !PURPOSE  : build <j|C|i> with j,i \in FockBasis
-  !+-------------------------------------------------------------------+
-  subroutine build_c_operator_fock(ispin,iorb,Cmat)
-    integer                              :: ispin,iorb
-    real(8),dimension(Nfock,Nfock) :: Cmat
-    integer                              :: imp,i,j,iup,idw
-    integer                              :: ivec(Nlevels)
-    real(8)                              :: c_,c_op,c_sgn
-    imp = iorb+(ispin-1)*Ns
-    Cmat=0d0
-    do idw=0,2**Ns-1
-       do iup=0,2**Ns-1
-          i = iup + idw*2**Ns
-          ivec = bdecomp(i,2*Ns)
-          if(ivec(imp)==0)cycle
-          call c(imp,i,j,c_)
-          Cmat(i+1,j+1) = c_
-       enddo
-    enddo
-  end subroutine build_c_operator_fock
-
-  subroutine build_cdg_operator_fock(ispin,iorb,Cmat)
-    integer                              :: ispin,iorb
-    real(8),dimension(Nfock,Nfock) :: Cmat
-    integer                              :: imp,i,j,iup,idw
-    integer                              :: ivec(Nlevels)
-    real(8)                              :: c_
-    imp = iorb+(ispin-1)*Ns
-    Cmat=0d0
-    do idw=0,2**Ns-1
-       do iup=0,2**Ns-1
-          i = iup + idw*2**Ns
-          ivec = bdecomp(i,2*Ns)
-          if(ivec(imp)==1)cycle
-          call cdg(imp,i,j,c_)
-          Cmat(i+1,j+1) = c_
-       enddo
-    enddo
-  end subroutine build_cdg_operator_fock
-
 
 
 
 
   !+-------------------------------------------------------------------+
-  !PURPOSE:
+  !PURPOSE: c_{iorb,ispin} = \sum_ab <a|c_{iorb,ispin}|b> |a><b|
   !+-------------------------------------------------------------------+
-  subroutine build_c_operator_eig(ispin,iorb,Cmat)
+  subroutine build_c_operator(ispin,iorb,Cmat)
     integer                        :: ispin,iorb
     real(8),dimension(Nfock,Nfock) :: Cmat
-    real(8),dimension(Nfock)       :: avec,bvec
     real(8)                        :: c_,Dab
     integer                        :: imp,i,j,ia,ib,iia,iib
     integer                        :: ivec(Nlevels)
     !
     imp = iorb+(ispin-1)*Norb
-    !
     Cmat=0d0
-    !
     do ib=1,Nfock               !loop over |b> states
        do ia=1,Nfock            !loop over <a| states
           Dab=0d0
-          do iib=0,Nfock-1        !now loop over the components of |b>=\sum_iib u^b_iib |iib>
+          do iib=1,Nfock        !now loop over the components of |b>=\sum_iib u^b_iib |iib>
              ivec = bdecomp(iib,2*Ns)
              if(ivec(imp) == 0) cycle
              call c(imp,iib,iia,c_)
-             Dab = Dab + EigBasis(ia,iia+1)*c_*EigBasis(iib+1,ib)
+             Dab = Dab + c_*EigBasis(ia,iia)*EigBasis(iib,ib)
           enddo
-          Cmat(ia,ib) = Cmat(ia,ib) + Dab
+          Cmat(ia,ib) = Dab
        enddo
     enddo
-  end subroutine build_c_operator_eig
+  end subroutine build_c_operator
 
 
-  subroutine build_cdg_operator_eig(ispin,iorb,Cmat)
+  subroutine build_cdg_operator(ispin,iorb,Cmat)
     integer                        :: ispin,iorb
     real(8),dimension(Nfock,Nfock) :: Cmat
-    real(8),dimension(Nfock)       :: avec,bvec
     real(8)                        :: c_,Dab
     integer                        :: imp,i,j,ia,ib,iia,iib
     integer                        :: ivec(Nlevels)
@@ -385,52 +317,98 @@ contains
     do ib=1,Nfock               !loop over |b> states
        do ia=1,Nfock            !loop over <a| states
           Dab=0d0
-          do iib=0,Nfock-1        !now loop over the components of |b>=\sum_iib u^b_iib |iib>
+          do iib=1,Nfock        !now loop over the components of |b>=\sum_iib u^b_iib |iib>
              ivec = bdecomp(iib,2*Ns)
              if(ivec(imp) == 1) cycle
              call cdg(imp,iib,iia,c_)
-             Dab = Dab + EigBasis(ia,iia+1)*c_*EigBasis(iib+1,ib)
+             Dab = Dab + c_*EigBasis(ia,iia)*EigBasis(iib,ib)
           enddo
-          Cmat(ia,ib) = Cmat(ia,ib) + Dab
+          Cmat(ia,ib) = Dab
        enddo
     enddo
-  end subroutine build_cdg_operator_eig
+  end subroutine build_cdg_operator
 
-  subroutine build_operators_eig(ispin,iorb,Cmat,CDGmat)
+
+  subroutine build_dens_operator(ispin,iorb,Cmat)
     integer                        :: ispin,iorb
-    real(8),dimension(Nfock,Nfock) :: Cmat,CDGmat
-    real(8)                        :: c_,Dab,cDab
+    real(8),dimension(Nfock,Nfock) :: Cmat
+    real(8)                        :: dens,Dab
     integer                        :: imp,i,j,ia,ib,iia,iib
     integer                        :: ivec(Nlevels)
     !
-    imp = iorb+(ispin-1)*Ns
+    imp = iorb+(ispin-1)*Norb
     !
     Cmat=0d0
-    CDGmat=0d0
     !
-    do ib=1,Nfock               !loop over |b> states
-       do ia=1,Nfock            !loop over <a| states
-          Dab=0d0
-          do iib=0,Nfock-1        !now loop over the components of |b>=\sum_iib u^b_iib |iib>
-             ivec = bdecomp(iib,2*Ns)
-             if(ivec(imp) == 0) cycle
-             call c(imp,iib,iia,c_)
-             Dab = Dab + EigBasis(ia,iia+1)*c_*EigBasis(iib+1,ib)
-          enddo
-          Cmat(ia,ib) = Cmat(ia,ib) + Dab
-          !
-          Dab=0d0
-          do iia=0,Nfock-1
-             ivec = bdecomp(iia,2*Ns)
-             if(ivec(imp) == 0) cycle
-             call c(imp,iia,iib,c_)
-             Dab = Dab + EigBasis(ia,iia+1)*c_*EigBasis(iib+1,ib)
-          enddo
-          CDGmat(ia,ib) = CDGmat(ia,ib) + Dab
+    do ia=1,Nfock
+       Dab=0d0
+       do iia=1,Nfock
+          ivec = bdecomp(iia,2*Ns)
+          dens = dble(ivec(imp))
+          Dab  = Dab + dens*EigBasis(ia,iia)*EigBasis(iia,ia)
        enddo
+       Cmat(ia,ia) =  Dab
     enddo
-  end subroutine build_operators_eig
-  
+  end subroutine build_dens_operator
+
+
+
+  subroutine build_docc_operator(iorb,Cmat)
+    integer                        :: iorb
+    real(8),dimension(Nfock,Nfock) :: Cmat
+    real(8)                        :: dens_up,dens_dw,docc,Dab
+    integer                        :: imp_up,imp_dw,ia,ib,iia,iib
+    integer                        :: ivec(Nlevels)
+    !
+    imp_up = iorb
+    imp_dw = iorb + Ns
+    !
+    Cmat=0d0
+    !
+    do ia=1,Nfock
+       Dab=0d0
+       do iia=1,Nfock
+          ivec = bdecomp(iia,2*Ns)
+          dens_up = dble(ivec(imp_up))
+          dens_dw = dble(ivec(imp_dw))
+          docc    = dens_up*dens_dw
+          Dab  = Dab + docc*EigBasis(ia,iia)*EigBasis(iia,ia)
+       enddo
+       Cmat(ia,ia) =  Dab
+    enddo
+  end subroutine build_docc_operator
+
+
+
+  subroutine build_sz2_operator(iorb,Cmat)
+    integer                        :: iorb
+    real(8),dimension(Nfock,Nfock) :: Cmat
+    real(8)                        :: dens_up,dens_dw,sz,sz2,Dab
+    integer                        :: imp_up,imp_dw,ia,ib,iia,iib
+    integer                        :: ivec(Nlevels)
+    !
+    imp_up = iorb
+    imp_dw = iorb + Ns
+    !
+    Cmat=0d0
+    !
+    do ia=1,Nfock
+       Dab=0d0
+       do iia=1,Nfock
+          ivec = bdecomp(iia,2*Ns)
+          dens_up = dble(ivec(imp_up))
+          dens_dw = dble(ivec(imp_dw))
+          sz      = 0.5d0*(dens_up-dens_dw)
+          sz2     = sz**2
+          Dab  = Dab + sz2*EigBasis(ia,iia)*EigBasis(iia,ia)
+       enddo
+       Cmat(ia,ia) =  Dab
+    enddo
+  end subroutine build_sz2_operator
+
+
+
+
 
 
 
@@ -440,20 +418,22 @@ contains
   subroutine nca_build_operators
     integer                              :: ispin,iorb,i,j,isector
     integer                              :: ivec(2*Ns),stride,dim
-
     do ispin=1,2
        do iorb=1,Norb
           allocate(Coperator(ispin,iorb)%Op(Nfock,Nfock))
           allocate(CDGoperator(ispin,iorb)%Op(Nfock,Nfock))
           Coperator(ispin,iorb)%Op(:,:)=0d0
           CDGoperator(ispin,iorb)%Op=0d0
-          ! call build_c_operator_eig(ispin,iorb,Coperator(ispin,iorb)%Op)
-          ! call build_cdg_operator_eig(ispin,iorb,CDGoperator(ispin,iorb)%Op)
-          call build_operators_eig(ispin,iorb,Coperator(ispin,iorb)%Op,CDGoperator(ispin,iorb)%Op)
+          !
+          call build_c_operator(ispin,iorb,Coperator(ispin,iorb)%Op)
+          call build_cdg_operator(ispin,iorb,CDGoperator(ispin,iorb)%Op)
+          ! CDGoperator(ispin,iorb)%Op = transpose(Coperator(ispin,iorb)%Op)
+          !
        enddo
     enddo
-    !
   end subroutine nca_build_operators
+
+
 
 
 
@@ -517,30 +497,6 @@ contains
        bsresult = mid      ! SUCCESS!!
     end if
   end function binary_search
-
-
-
-
-
-
-  !+------------------------------------------------------------------+
-  !PURPOSE  : print a state vector |{up}>|{dw}>
-  !+------------------------------------------------------------------+
-  subroutine print_state_vector_ivec(ivec,unit)
-    integer,intent(in) :: ivec(:)
-    integer,optional   :: unit
-    integer            :: unit_
-    integer            :: i,j,Ntot
-    character(len=2)   :: fbt
-    character(len=16)  :: fmt
-    unit_=6;if(present(unit))unit_=unit
-    Ntot = size(ivec)
-    i= bjoin(ivec,Ntot)
-    write(unit_,"(I9,1x,A1)",advance="no")i,"|"
-    write(unit_,"(10I1)",advance="no")(ivec(j),j=1,Ntot)
-    write(unit_,"(A4)",advance="yes")">"
-  end subroutine print_state_vector_ivec
-  !
 
 
 
